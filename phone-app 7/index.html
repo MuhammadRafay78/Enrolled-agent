@@ -3599,11 +3599,15 @@ __boot();
   async function send() {
     const q = input.value.trim();
     if (!q) return;
-    addMsg(q, true);
+    const userMsg = addMsg(q, true);
     input.value = '';
     input.style.height = 'auto';
     sendBtn.disabled = true;
     const typing = addTyping();
+
+    // Scroll so the user's question is visible at the top of the messages area
+    // Then don't auto-scroll again — let user read at their own pace
+    userMsg.scrollIntoView({ block: 'start', behavior: 'smooth' });
 
     // Grab the currently visible question and answer options from the page
     let context = '';
@@ -3626,32 +3630,39 @@ __boot();
       context +
       'STUDENT QUESTION: ' + q;
 
-    try {
+    // Try the request, with one automatic retry on empty response
+    async function attemptRequest() {
       const res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: fullPrompt })
       });
+      if (!res.ok || !res.body) return '';
 
-      if (!res.ok || !res.body) {
-        typing.textContent = 'Error: could not reach the AI. Please try again.';
-        sendBtn.disabled = false;
-        return;
-      }
-
-      // Stream the response chunk by chunk
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let fullText = '';
-      typing.innerHTML = ''; // clear typing dots
+      let text = '';
+      typing.innerHTML = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        fullText += decoder.decode(value, { stream: true });
-        typing.innerHTML = renderMarkdown(fullText);
-        messages.scrollTop = messages.scrollHeight;
+        text += decoder.decode(value, { stream: true });
+        typing.innerHTML = renderMarkdown(text);
+        // NO auto-scroll while streaming — user reads at their own pace
       }
-      if (!fullText) typing.textContent = 'Sorry, no response.';
+      return text;
+    }
+
+    try {
+      let fullText = await attemptRequest();
+      if (!fullText) {
+        typing.innerHTML = '<div class="ai-typing"><span></span><span></span><span></span></div>';
+        await new Promise(r => setTimeout(r, 500));
+        fullText = await attemptRequest();
+      }
+      if (!fullText) {
+        typing.textContent = 'The AI is busy — please try again in a moment.';
+      }
     } catch (e) {
       typing.textContent = 'Error: could not reach the AI. Please try again.';
     }
