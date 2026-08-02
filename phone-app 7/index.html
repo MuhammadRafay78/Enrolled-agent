@@ -3444,13 +3444,31 @@ __boot();
     input.value = '';
     sendBtn.disabled = true;
     const thinking = addMsg('Thinking...', false);
+
+    // Grab the currently visible question and answer options from the page
+    let context = '';
+    const qtextEl = document.querySelector('.qtext');
+    if (qtextEl && qtextEl.offsetParent !== null) {
+      context = 'CURRENT QUESTION ON SCREEN:\n' + qtextEl.innerText.trim() + '\n\nANSWER OPTIONS:\n';
+      const opts = document.querySelectorAll('.opt');
+      opts.forEach((o, i) => {
+        if (o.offsetParent !== null) {
+          context += String.fromCharCode(65 + i) + '. ' + o.innerText.trim() + '\n';
+        }
+      });
+      context += '\n';
+    }
+
+    const fullPrompt =
+      'You are a helpful tutor for the IRS Enrolled Agent (EA) exam. Answer clearly and concisely.\n\n' +
+      context +
+      'STUDENT QUESTION: ' + q;
+
     try {
       const res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          prompt: 'You are a helpful tutor for the IRS Enrolled Agent (EA) exam. Answer clearly and concisely. Question: ' + q
-        })
+        body: JSON.stringify({ prompt: fullPrompt })
       });
       const data = await res.json();
       thinking.textContent = data.reply || data.error || 'Sorry, no response.';
