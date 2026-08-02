@@ -3422,7 +3422,12 @@ __boot();
   #ai-tutor-header{
     background:linear-gradient(135deg,var(--blue) 0%,#7c3aed 100%);
     color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;
+    cursor:pointer;user-select:none;
   }
+  #ai-tutor-header:hover{filter:brightness(1.05);}
+  #ai-tutor-panel.minimized{height:auto !important;}
+  #ai-tutor-panel.minimized #ai-tutor-messages,
+  #ai-tutor-panel.minimized #ai-tutor-input-wrap{display:none;}
   #ai-tutor-header .title{display:flex;align-items:center;gap:10px;font-weight:600;font-size:16px;}
   #ai-tutor-header .avatar{
     width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);
@@ -3508,7 +3513,7 @@ __boot();
     <div class="ai-msg bot">👋 Hey! I'm your EA exam tutor. I can see the question on your screen — just ask me to explain it, or ask any tax question about Parts 1, 2, or 3.</div>
   </div>
   <div id="ai-tutor-input-wrap">
-    <textarea id="ai-tutor-input" rows="1" placeholder="Ask about the current question or anything EA-related..."></textarea>
+    <textarea id="ai-tutor-input" rows="1" placeholder="Ask anything..."></textarea>
     <button id="ai-tutor-send" title="Send">➤</button>
   </div>
 </div>
@@ -3522,8 +3527,13 @@ __boot();
   const sendBtn = document.getElementById('ai-tutor-send');
   const messages = document.getElementById('ai-tutor-messages');
 
-  btn.onclick = () => { panel.style.display = 'flex'; btn.style.display = 'none'; setTimeout(()=>input.focus(),100); };
-  closeBtn.onclick = () => { panel.style.display = 'none'; btn.style.display = 'flex'; };
+  btn.onclick = () => { panel.style.display = 'flex'; btn.style.display = 'none'; panel.classList.remove('minimized'); setTimeout(()=>input.focus(),100); };
+  closeBtn.onclick = (e) => { e.stopPropagation(); panel.style.display = 'none'; btn.style.display = 'flex'; };
+  // Click header (but not close button) to minimize/expand
+  document.getElementById('ai-tutor-header').onclick = () => {
+    panel.classList.toggle('minimized');
+    if (!panel.classList.contains('minimized')) setTimeout(()=>input.focus(),100);
+  };
 
   // Auto-grow textarea
   input.addEventListener('input', () => {
@@ -3622,9 +3632,26 @@ __boot();
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: fullPrompt })
       });
-      const data = await res.json();
-      typing.innerHTML = renderMarkdown(data.reply || data.error || 'Sorry, no response.');
-      messages.scrollTop = messages.scrollHeight;
+
+      if (!res.ok || !res.body) {
+        typing.textContent = 'Error: could not reach the AI. Please try again.';
+        sendBtn.disabled = false;
+        return;
+      }
+
+      // Stream the response chunk by chunk
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let fullText = '';
+      typing.innerHTML = ''; // clear typing dots
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        fullText += decoder.decode(value, { stream: true });
+        typing.innerHTML = renderMarkdown(fullText);
+        messages.scrollTop = messages.scrollHeight;
+      }
+      if (!fullText) typing.textContent = 'Sorry, no response.';
     } catch (e) {
       typing.textContent = 'Error: could not reach the AI. Please try again.';
     }
