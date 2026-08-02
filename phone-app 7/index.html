@@ -1253,6 +1253,40 @@ function dueReview(){
   out.sort(function(a,b){return (b.m-a.m)||(a.s-b.s);});
   return out;
 }
+// ---------- daily activity tracking (EST timezone) ----------
+// Tracks how many questions the user answers per day, across all Parts.
+// Stored under an ea3quiz_ key so it syncs cross-device via Supabase.
+var DAILY_KEY='ea3quiz_v2_daily';
+function estDate(d){
+  // Returns YYYY-MM-DD in America/New_York timezone
+  try{return (d||new Date()).toLocaleDateString('en-CA',{timeZone:'America/New_York'});}
+  catch(e){return (d||new Date()).toISOString().slice(0,10);}
+}
+function dailyLog(){
+  try{return JSON.parse(localStorage.getItem(DAILY_KEY))||{};}catch(e){return {};}
+}
+function recordAnswerToday(){
+  var log=dailyLog(); var k=estDate();
+  log[k]=(log[k]||0)+1;
+  try{localStorage.setItem(DAILY_KEY,JSON.stringify(log));}catch(e){}
+}
+function todayCount(){ return dailyLog()[estDate()]||0; }
+function currentStreak(){
+  var log=dailyLog(); var streak=0;
+  var d=new Date();
+  // If today has 0, streak might still be alive counting from yesterday — but
+  // for a study-habit tracker, we want to reflect "today included."
+  // Convention: streak counts consecutive days with >0 up to and including today.
+  // If today is 0, streak = 0 (broken).
+  if(!log[estDate(d)])return 0;
+  while(true){
+    var k=estDate(d);
+    if(log[k]&&log[k]>0){streak++;d.setDate(d.getDate()-1);}
+    else break;
+    if(streak>3650)break; // safety
+  }
+  return streak;
+}
 // ---------- accounts + cross-device sync ----------
 // Talks to Supabase's REST API with plain fetch, so the file stays self-contained.
 // With no account configured, or signed out, everything below is inert and the app
@@ -1963,7 +1997,9 @@ function showMenu(){
       (swPartTotal(swGetAll(),PART)>0?'<span class="mpill" style="cursor:default">⏱ '+fmtDur(swPartTotal(swGetAll(),PART))+'</span>':'')+
       '<button class="mpill" id="partPill">Part 1 · 2 · 3</button></div></div>';
 
-  // ---- three stat cards ----
+  // ---- four stat cards ----
+  var _today=todayCount(), _streak=currentStreak();
+  var _streakStr = _streak>0 ? ('🔥 '+_streak+'-day streak') : 'Answer a question to start a streak';
   html+='<div class="mstats">'+
     '<div class="mstat"><div class="lbl">Answered</div><div class="val">'+ansAll.toLocaleString()+
       '<small> / '+totalQ.toLocaleString()+'</small></div><div class="mbar"><i style="width:'+(totalQ?Math.round(ansAll/totalQ*100):0)+'%"></i></div></div>'+
@@ -1971,6 +2007,8 @@ function showMenu(){
       '</div><div class="mbar"><i class="ok" style="width:'+pct+'%"></i></div></div>'+
     '<div class="mstat"><div class="lbl">Due for review</div><div class="val" style="color:'+(due.length?'#b45309':'var(--muted)')+'">'+due.length+'</div>'+
       '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+(weakest?'Weakest: '+esc(weakest.u.replace(/:.*$/,''))+' ('+Math.round(weakest.p*100)+'%)':'Answer a few to see gaps')+'</div></div>'+
+    '<div class="mstat"><div class="lbl">Today</div><div class="val" style="color:'+(_today?'#2563eb':'var(--muted)')+'">'+_today+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+_streakStr+'</div></div>'+
   '</div>';
 
   if(totalQ)html+='<input class="searchbox" id="searchBox" placeholder="🔍 Search all '+totalQ.toLocaleString()+' questions by keyword or topic…"><div id="sres"></div>';
@@ -2503,13 +2541,14 @@ function pick(dispJ){
   const qIdx=st.order[pos],Q=QUESTIONS[qIdx],perm=getPerm(qIdx);
   const orig=perm[dispJ];
   if(st.mode==='exam'&&!st.examDone){
-    st.answers[qIdx]=orig;saveState();markSelection();renderSide();headerScore();
+    st.answers[qIdx]=orig;recordAnswerToday();saveState();markSelection();renderSide();headerScore();
     const c=counts();document.getElementById('prog').style.width=(c.ans/QUESTIONS.length*100)+'%';
     return;
   }
   if(st.answers[qIdx]!==null)return;
   st.answers[qIdx]=orig;
   updateSrs(refOf(qIdx),orig===Q.a);
+  recordAnswerToday();
   saveState();renderSide();showFeedback();headerScore();
   const c=counts();document.getElementById('prog').style.width=(c.ans/QUESTIONS.length*100)+'%';
 }
@@ -3401,120 +3440,114 @@ __boot();
 <style>
   #ai-tutor-btn{
     position:fixed;bottom:24px;right:24px;
-    background:linear-gradient(135deg,var(--blue) 0%,#7c3aed 100%);
-    color:#fff;width:60px;height:60px;border-radius:50%;
+    background:var(--ink);color:var(--card);
+    width:52px;height:52px;border-radius:50%;
     display:flex;align-items:center;justify-content:center;cursor:pointer;
-    box-shadow:0 8px 24px rgba(0,0,0,.25);font-size:26px;z-index:9999;
-    transition:transform .2s,box-shadow .2s;border:none;
+    box-shadow:0 4px 16px rgba(0,0,0,.15);font-size:20px;z-index:9999;
+    transition:transform .15s;border:none;
   }
-  #ai-tutor-btn:hover{transform:scale(1.08);box-shadow:0 12px 32px rgba(0,0,0,.35);}
+  #ai-tutor-btn:hover{transform:scale(1.05);}
   #ai-tutor-panel{
     position:fixed;bottom:24px;right:24px;
-    width:440px;max-width:calc(100vw - 32px);
-    height:640px;max-height:calc(100vh - 48px);
-    background:var(--card);border:1px solid var(--border);border-radius:20px;
-    box-shadow:0 20px 60px rgba(0,0,0,.35);z-index:9999;
+    width:400px;max-width:calc(100vw - 32px);
+    height:600px;max-height:calc(100vh - 48px);
+    background:var(--card);border:1px solid var(--border);border-radius:12px;
+    box-shadow:0 10px 40px rgba(0,0,0,.15);z-index:9999;
     display:none;flex-direction:column;overflow:hidden;
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
-    animation:aiSlideUp .3s ease-out;color:var(--ink);
+    color:var(--ink);
   }
-  @keyframes aiSlideUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
   #ai-tutor-header{
-    background:linear-gradient(135deg,var(--blue) 0%,#7c3aed 100%);
-    color:#fff;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;
-    cursor:pointer;user-select:none;
+    background:var(--card);color:var(--ink);
+    padding:14px 18px;display:flex;justify-content:space-between;align-items:center;
+    cursor:pointer;user-select:none;border-bottom:1px solid var(--border);
+    font-weight:500;font-size:14px;
   }
-  #ai-tutor-header:hover{filter:brightness(1.05);}
+  #ai-tutor-header:hover{background:var(--bg);}
   #ai-tutor-panel.minimized{height:auto !important;}
   #ai-tutor-panel.minimized #ai-tutor-messages,
   #ai-tutor-panel.minimized #ai-tutor-input-wrap{display:none;}
-  #ai-tutor-header .title{display:flex;align-items:center;gap:10px;font-weight:600;font-size:16px;}
-  #ai-tutor-header .avatar{
-    width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.2);
-    display:flex;align-items:center;justify-content:center;font-size:18px;
-  }
-  #ai-tutor-header .subtitle{font-size:12px;opacity:.85;font-weight:400;margin-top:2px;}
-  #ai-tutor-close{cursor:pointer;font-size:24px;line-height:1;opacity:.85;transition:opacity .2s;color:#fff;}
-  #ai-tutor-close:hover{opacity:1;}
+  #ai-tutor-close{cursor:pointer;font-size:20px;line-height:1;color:var(--muted);transition:color .2s;}
+  #ai-tutor-close:hover{color:var(--ink);}
   #ai-tutor-messages{
-    flex:1;overflow-y:auto;padding:20px;
-    font-size:15px;line-height:1.6;color:var(--ink);
-    background:var(--bg);
+    flex:1;overflow-y:auto;padding:18px;
+    font-size:14px;line-height:1.6;color:var(--ink);
+    background:var(--card);
   }
-  #ai-tutor-messages::-webkit-scrollbar{width:6px;}
-  #ai-tutor-messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
-  .ai-msg{margin-bottom:14px;max-width:85%;padding:12px 16px;border-radius:16px;word-wrap:break-word;}
+  #ai-tutor-messages::-webkit-scrollbar{width:4px;}
+  #ai-tutor-messages::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+  .ai-msg{margin-bottom:16px;padding:0;word-wrap:break-word;}
   .ai-msg.user{
-    background:linear-gradient(135deg,var(--blue) 0%,#7c3aed 100%);
-    color:#fff;margin-left:auto;border-bottom-right-radius:4px;
+    color:var(--ink);font-weight:500;
+    padding:10px 14px;background:var(--bg);border-radius:8px;
+    max-width:85%;margin-left:auto;
   }
-  .ai-msg.bot{
-    background:var(--card);color:var(--ink);border:1px solid var(--border);
-    border-bottom-left-radius:4px;box-shadow:0 1px 2px rgba(0,0,0,.06);
-  }
-  .ai-msg.bot h1,.ai-msg.bot h2,.ai-msg.bot h3{margin:12px 0 6px;font-weight:700;line-height:1.3;color:var(--ink);}
-  .ai-msg.bot h1{font-size:18px;} .ai-msg.bot h2{font-size:16px;} .ai-msg.bot h3{font-size:15px;color:var(--blue);}
+  .ai-msg.bot{color:var(--ink);}
+  .ai-msg.bot h1,.ai-msg.bot h2,.ai-msg.bot h3{margin:14px 0 6px;font-weight:600;line-height:1.3;color:var(--ink);}
+  .ai-msg.bot h1{font-size:16px;} .ai-msg.bot h2{font-size:15px;} .ai-msg.bot h3{font-size:14px;}
   .ai-msg.bot p{margin:6px 0;}
-  .ai-msg.bot ul,.ai-msg.bot ol{margin:6px 0;padding-left:22px;}
+  .ai-msg.bot ul,.ai-msg.bot ol{margin:6px 0;padding-left:20px;}
   .ai-msg.bot li{margin:3px 0;}
-  .ai-msg.bot strong{font-weight:700;color:var(--ink);}
+  .ai-msg.bot strong{font-weight:600;color:var(--ink);}
   .ai-msg.bot em{font-style:italic;}
-  .ai-msg.bot code{background:var(--bg);padding:2px 6px;border-radius:4px;font-size:13px;font-family:'SF Mono',Menlo,monospace;color:var(--blue);border:1px solid var(--border);}
-  .ai-msg.bot pre{background:var(--bg);padding:10px;border-radius:8px;overflow-x:auto;margin:8px 0;border:1px solid var(--border);}
-  .ai-msg.bot pre code{background:none;padding:0;border:none;}
-  .ai-msg.bot blockquote{border-left:3px solid var(--blue);padding-left:12px;margin:8px 0;color:var(--muted);}
-  .ai-typing{display:inline-flex;gap:4px;padding:12px 16px;}
-  .ai-typing span{width:8px;height:8px;background:var(--muted);border-radius:50%;animation:aiBounce 1.4s infinite;}
+  .ai-msg.bot code{background:var(--bg);padding:1px 5px;border-radius:3px;font-size:12.5px;font-family:'SF Mono',Menlo,monospace;color:var(--ink);}
+  .ai-msg.bot pre{background:var(--bg);padding:10px;border-radius:6px;overflow-x:auto;margin:8px 0;}
+  .ai-msg.bot pre code{background:none;padding:0;}
+  .ai-msg.bot blockquote{border-left:2px solid var(--border);padding-left:12px;margin:8px 0;color:var(--muted);}
+  .ai-typing{display:inline-flex;gap:4px;padding:4px 0;}
+  .ai-typing span{width:6px;height:6px;background:var(--muted);border-radius:50%;animation:aiBounce 1.4s infinite;}
   .ai-typing span:nth-child(2){animation-delay:.2s;}
   .ai-typing span:nth-child(3){animation-delay:.4s;}
-  @keyframes aiBounce{0%,60%,100%{transform:translateY(0);opacity:.4;}30%{transform:translateY(-8px);opacity:1;}}
+  @keyframes aiBounce{0%,60%,100%{transform:translateY(0);opacity:.4;}30%{transform:translateY(-6px);opacity:1;}}
   #ai-tutor-input-wrap{
-    border-top:1px solid var(--border);padding:14px;background:var(--card);
-    display:flex;gap:10px;align-items:flex-end;
+    border-top:1px solid var(--border);padding:12px;background:var(--card);
+    display:flex;gap:8px;align-items:flex-end;
   }
   #ai-tutor-input{
-    flex:1;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;
+    flex:1;padding:10px 12px;border:1px solid var(--border);border-radius:6px;
     font-size:14px;font-family:inherit;outline:none;resize:none;
-    max-height:100px;transition:border-color .2s;
-    background:var(--bg);color:var(--ink);
+    max-height:100px;transition:border-color .15s;
+    background:var(--card);color:var(--ink);
   }
-  #ai-tutor-input:focus{border-color:var(--blue);}
+  #ai-tutor-input:focus{border-color:var(--ink);}
   #ai-tutor-input::placeholder{color:var(--muted);}
   #ai-tutor-send{
-    background:linear-gradient(135deg,var(--blue) 0%,#7c3aed 100%);
-    color:#fff;border:none;border-radius:12px;width:44px;height:44px;
+    background:var(--ink);color:var(--card);
+    border:none;border-radius:6px;width:38px;height:38px;
     display:flex;align-items:center;justify-content:center;
-    cursor:pointer;font-size:18px;transition:transform .15s,opacity .2s;
+    cursor:pointer;font-size:14px;transition:opacity .15s;
   }
-  #ai-tutor-send:hover:not(:disabled){transform:scale(1.05);}
-  #ai-tutor-send:disabled{opacity:.5;cursor:not-allowed;}
+  #ai-tutor-send:hover:not(:disabled){opacity:.85;}
+  #ai-tutor-send:disabled{opacity:.4;cursor:not-allowed;}
   @media(max-width:500px){
     #ai-tutor-panel{width:100vw;height:100vh;max-height:100vh;bottom:0;right:0;border-radius:0;}
   }
   @media print{ #ai-tutor-btn,#ai-tutor-panel{display:none !important;} }
+  #ai-tutor-resize{
+    position:absolute;top:0;left:0;width:16px;height:16px;
+    cursor:nwse-resize;z-index:10;
+    background:linear-gradient(135deg,transparent 45%,var(--muted) 45%,var(--muted) 55%,transparent 55%);
+    opacity:.5;transition:opacity .15s;
+  }
+  #ai-tutor-resize:hover{opacity:1;}
+  #ai-tutor-panel.minimized #ai-tutor-resize{display:none;}
+  @media(max-width:500px){ #ai-tutor-resize{display:none;} }
 </style>
 
-<div id="ai-tutor-btn" title="Ask EA Tutor">✨</div>
+<div id="ai-tutor-btn" title="Ask EA Tutor">✦</div>
 
 <div id="ai-tutor-panel">
+  <div id="ai-tutor-resize" title="Drag to resize"></div>
   <div id="ai-tutor-header">
-    <div>
-      <div class="title">
-        <div class="avatar">🎓</div>
-        <div>
-          <div>EA Tutor</div>
-          <div class="subtitle">Powered by AI · Ask anything</div>
-        </div>
-      </div>
-    </div>
+    <span>EA Tutor</span>
     <span id="ai-tutor-close">×</span>
   </div>
   <div id="ai-tutor-messages">
-    <div class="ai-msg bot">👋 Hey! I'm your EA exam tutor. I can see the question on your screen — just ask me to explain it, or ask any tax question about Parts 1, 2, or 3.</div>
+    <div class="ai-msg bot">Hi. Ask me about the current question or any EA exam topic.</div>
   </div>
   <div id="ai-tutor-input-wrap">
     <textarea id="ai-tutor-input" rows="1" placeholder="Ask anything..."></textarea>
-    <button id="ai-tutor-send" title="Send">➤</button>
+    <button id="ai-tutor-send" title="Send">→</button>
   </div>
 </div>
 
@@ -3673,6 +3706,56 @@ __boot();
   sendBtn.onclick = send;
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  // Escape key minimizes the panel (only when it's open)
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && panel.style.display === 'flex' && !panel.classList.contains('minimized')) {
+      panel.classList.add('minimized');
+      input.blur();
+    }
+  });
+
+  // ---- Resize handle (drag from top-left corner) ----
+  const resizeHandle = document.getElementById('ai-tutor-resize');
+  const SIZE_KEY = 'ea3quiz_v2_tutorSize';
+  // Restore saved size on load
+  try {
+    const saved = JSON.parse(localStorage.getItem(SIZE_KEY) || 'null');
+    if (saved && saved.w && saved.h) {
+      panel.style.width = saved.w + 'px';
+      panel.style.height = saved.h + 'px';
+    }
+  } catch(e) {}
+
+  let resizing = false, startX = 0, startY = 0, startW = 0, startH = 0;
+  resizeHandle.addEventListener('mousedown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    resizing = true;
+    startX = e.clientX; startY = e.clientY;
+    startW = panel.offsetWidth; startH = panel.offsetHeight;
+    document.body.style.userSelect = 'none';
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!resizing) return;
+    // Dragging up-left grows the panel (since panel is anchored bottom-right)
+    const dx = startX - e.clientX;
+    const dy = startY - e.clientY;
+    const newW = Math.min(Math.max(320, startW + dx), window.innerWidth - 40);
+    const newH = Math.min(Math.max(400, startH + dy), window.innerHeight - 40);
+    panel.style.width = newW + 'px';
+    panel.style.height = newH + 'px';
+  });
+  document.addEventListener('mouseup', () => {
+    if (!resizing) return;
+    resizing = false;
+    document.body.style.userSelect = '';
+    // Save the new size
+    try {
+      localStorage.setItem(SIZE_KEY, JSON.stringify({
+        w: panel.offsetWidth, h: panel.offsetHeight
+      }));
+    } catch(e) {}
   });
 })();
 </script>
