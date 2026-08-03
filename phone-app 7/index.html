@@ -3521,6 +3521,14 @@ __boot();
   #ai-tutor-send:disabled{opacity:.4;cursor:not-allowed;}
   @media(max-width:500px){
     #ai-tutor-panel{width:100vw;height:100vh;max-height:100vh;bottom:0;right:0;border-radius:0;}
+    #ai-tutor-btn{width:46px;height:46px;font-size:17px;bottom:16px;right:16px;}
+    /* When in a quiz, gridToggle is at bottom-right — stack AI button above it */
+    body.inquiz #ai-tutor-btn{bottom:80px;}
+    /* And push totop even further up so it doesn't collide with AI button */
+    body.inquiz .totop{bottom:140px;}
+    /* Hide AI button when the question list (side panel) is fullscreen open */
+    body:has(.side.active.open) #ai-tutor-btn,
+    body:has(.side.active.open) #ai-tutor-panel{display:none !important;}
   }
   @media print{ #ai-tutor-btn,#ai-tutor-panel{display:none !important;} }
   #ai-tutor-resize{
