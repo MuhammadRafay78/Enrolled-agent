@@ -3665,9 +3665,16 @@ __boot();
     }
 
     const fullPrompt =
-      'You are a friendly, expert tutor for the IRS Enrolled Agent (EA) exam. ' +
-      'Format your answers with clear markdown: use **bold** for key terms, ### for section headings, ' +
-      'and bullet points for lists. Keep explanations concise but complete.\n\n' +
+      'You are a friendly, expert tutor for the IRS Enrolled Agent (EA) exam.\n\n' +
+      'IMPORTANT — TAX YEAR CONTEXT:\n' +
+      'The current EA Special Enrollment Examination (SEE) testing cycle runs May 1, 2026 through February 28, 2027, ' +
+      'and tests TAX YEAR 2025 law (returns filed in 2026). ALL your answers must reference tax year 2025 figures, ' +
+      'brackets, standard deduction, contribution limits, phase-outs, mileage rates, and thresholds. ' +
+      'Do NOT use 2024 numbers. Do NOT use 2023 numbers. If you are unsure whether a specific number reflects ' +
+      'the 2025 tax year, say so plainly rather than guessing. Also account for changes enacted by the One Big ' +
+      'Beautiful Bill Act (OBBBA) where relevant.\n\n' +
+      'FORMAT: Use clear markdown — **bold** for key terms, ### for section headings, bullet points for lists. ' +
+      'Keep explanations concise but complete.\n\n' +
       context +
       'STUDENT QUESTION: ' + q;
 
