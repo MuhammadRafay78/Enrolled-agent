@@ -3641,15 +3641,55 @@ __boot();
   async function send() {
     const q = input.value.trim();
     if (!q) return;
-    const userMsg = addMsg(q, true);
+
+    // ---- Rate limit: 30/day for all users, unlimited for Rafay ----
+    var currentUser = '';
+    try { currentUser = ((typeof auth === 'function' && auth()) || {}).name || ''; } catch(e) {}
+    var isRafay = /^rafay$/i.test(currentUser.trim());
+    var AI_USAGE_KEY = 'ea3quiz_v2_aiUsage';
+    var DAILY_LIMIT = 30;
+    function todayEst(){
+      try{return new Date().toLocaleDateString('en-CA',{timeZone:'America/New_York'});}
+      catch(e){return new Date().toISOString().slice(0,10);}
+    }
+    function readUsage(){
+      try{return JSON.parse(localStorage.getItem(AI_USAGE_KEY))||{};}catch(e){return {};}
+    }
+    if (!isRafay) {
+      var usage = readUsage();
+      var used = usage[todayEst()] || 0;
+      if (used >= DAILY_LIMIT) {
+        addMsg(q, true);
+        input.value = '';
+        input.style.height = 'auto';
+        var limitMsg = document.createElement('div');
+        limitMsg.className = 'ai-msg bot';
+        limitMsg.innerHTML = '<strong>Daily limit reached.</strong><br>You\'ve used all '+DAILY_LIMIT+' AI questions for today. The limit resets at midnight (Eastern Time).';
+        messages.appendChild(limitMsg);
+        input.focus();
+        return;
+      }
+    }
+
+    addMsg(q, true);
     input.value = '';
     input.style.height = 'auto';
     sendBtn.disabled = true;
     const typing = addTyping();
 
+    // Increment usage counter (for non-Rafay users)
+    if (!isRafay) {
+      try {
+        var u = readUsage();
+        var k = todayEst();
+        u[k] = (u[k] || 0) + 1;
+        localStorage.setItem(AI_USAGE_KEY, JSON.stringify(u));
+      } catch(e) {}
+    }
+
     // Scroll so the user's question is visible at the top of the messages area
-    // Then don't auto-scroll again — let user read at their own pace
-    userMsg.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    const userMsg = messages.lastElementChild.previousElementSibling; // the just-added user msg
+    if (userMsg) userMsg.scrollIntoView({ block: 'start', behavior: 'smooth' });
 
     // Grab the currently visible question and answer options from the page
     let context = '';
