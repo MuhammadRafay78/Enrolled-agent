@@ -2451,6 +2451,7 @@ function render(){
   card.innerHTML='<div class="badges"><span class="badge">'+Q.topic+'</span><span class="badge unit">'+Q.unit+'</span>'+
     (exam<0&&REVIEW_REFS[qIdx]?'<span class="badge unit">'+REVIEW_REFS[qIdx].replace(/m(\d+)_(\d+)/,function(_,e,i){return 'Mock '+(+e+1)+' · Q'+(+i+1);})+'</span>':'')+
     '<button class="flagbtn'+(st.flags[qIdx]?' on':'')+'" id="flagBtn">⚑ '+(st.flags[qIdx]?'Flagged':'Flag')+'</button>'+
+    (st.answers[qIdx]!==null?'<button class="flagbtn" id="resetQBtn" title="Clear your answer for this question">↺ Reset</button>':'')+
     (canReveal()&&st.answers[qIdx]===null&&!st.revealAll?'<button class="flagbtn'+(isRevealed(qIdx)?' on':'')+'" id="seeAnsBtn">👁 '+(isRevealed(qIdx)?'Hide answer':'See answer')+'</button>':'')+'</div>'+
     '<div class="qtext">'+Q.q+'</div>'+
     '<div id="opts">'+perm.map(function(orig,j){return '<button class="opt" data-i="'+j+'"><span class="letter">'+letters[j]+'.</span>'+Q.opts[orig]+'</button>';}).join('')+'</div>'+
@@ -2461,6 +2462,16 @@ function render(){
   wireRefresher();
   document.getElementById('flagBtn').onclick=function(){
     st.flags[qIdx]=!st.flags[qIdx];saveState();renderSide();render();
+  };
+  var rqb=document.getElementById('resetQBtn');
+  if(rqb)rqb.onclick=function(){
+    if(!confirm('Reset your answer to this question? You can answer it again.'))return;
+    st.answers[qIdx]=null;
+    setRevealed(qIdx,false);
+    saveState();
+    renderSide();
+    render();
+    headerScore();
   };
   document.getElementById('prev').onclick=function(){if(pos>0){pos--;renderSide();render();scrollTop();}};
   document.getElementById('next').onclick=function(){
