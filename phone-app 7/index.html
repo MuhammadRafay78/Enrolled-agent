@@ -3176,6 +3176,7 @@ function showDashboard(){
   };
   EXAMS.forEach(function(ex,e){const s=loadState(e);if(s)fold(ex.questions,s.answers);});
   MCQS.forEach(function(mc,mi){const s=mcqState(mi);if(s)fold(mc.questions,s.answers);});
+  XTRA.forEach(function(g,i){const s=xState(i);if(s)fold(g.questions,s.answers);});
   if(!tA){
     card.innerHTML='<div class="end"><h2>📊 My Performance</h2><p style="margin:14px 0">No answers recorded yet — answer some questions in any mock or chapter, then check back here to see your strongest and weakest areas.</p>'+timeReport()+'<button class="restart" id="menu">Exam Menu</button></div>';
     document.getElementById('menu').onclick=showMenu;return;
@@ -3188,7 +3189,7 @@ function showDashboard(){
   const pct=Math.round(tR/tA*100);
   card.innerHTML='<div class="end"><h2>📊 My Performance</h2>'+
     '<div class="big" style="color:'+(pct>=75?'var(--green)':'var(--red)')+'">'+pct+'%</div>'+
-    '<p><b>'+tR+' of '+tA+'</b> questions answered correctly across all mocks. The exam pass line is roughly 75% — anything below that in a section needs restudy. Weakest areas are listed first.</p>'+
+    '<p><b>'+tR+' of '+tA+'</b> questions answered correctly across all mocks, chapter questions, and extra questions. The exam pass line is roughly 75% — anything below that in a section needs restudy. Weakest areas are listed first.</p>'+
     '<h4 style="margin-top:16px">By Study Unit</h4><table><tr><th>Study Unit</th><th>Score</th><th style="min-width:90px">Bar</th></tr>'+mk(uRows)+'</table>'+
     (tRows.length?'<h4 style="margin-top:16px">Weakest Topics <span style="font-weight:400;color:var(--muted)">(2+ questions answered)</span></h4><table><tr><th>Topic</th><th>Score</th><th style="min-width:90px">Bar</th></tr>'+mk(tRows)+'</table>':'')+
     '<p style="color:var(--muted);font-size:13px;margin-top:12px">Tip: use 🔁 Smart Review on the menu to drill the exact questions behind these numbers.</p>'+
