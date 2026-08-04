@@ -1374,7 +1374,19 @@ function signOut(){ setAuth(null); PULLED=false; setSync('off'); renderAcct(); }
 var ADMINS=['rafay'];
 var SESSION_KEY='ea3quiz_session_owner';
 function isAdminUser(){
-  try{ var a=auth(); return !!(a && a.name && ADMINS.indexOf(String(a.name).toLowerCase().trim())>=0); }catch(e){ return false; }
+  try{
+    var a=auth(); if(!a) return false;
+    // Check the name field (old-style auth)
+    if(a.name && ADMINS.indexOf(String(a.name).toLowerCase().trim())>=0) return true;
+    // Check the email field (Supabase auth) — match against the email prefix before @
+    if(a.email){
+      var prefix=String(a.email).toLowerCase().split('@')[0].trim();
+      if(ADMINS.indexOf(prefix)>=0) return true;
+      // Also try the full email against ADMINS (in case someone adds a full email)
+      if(ADMINS.indexOf(String(a.email).toLowerCase().trim())>=0) return true;
+    }
+    return false;
+  }catch(e){ return false; }
 }
 function claimSession(){
   if(!auth() || !SUPA.url || !SUPA.key) return;
