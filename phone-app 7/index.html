@@ -292,6 +292,44 @@
   .mgrouphd button:hover{color:var(--blue);}
   .mgrid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:20px;}
   .mgrid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px;}
+  /* Flashcard mode — Brainscape style */
+  .fc-wrap{max-width:640px;margin:0 auto;padding:20px 0;}
+  .fc-topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:12px;font-size:13px;color:var(--muted);}
+  .fc-mastery{display:flex;align-items:center;gap:8px;}
+  .fc-mastery-bar{width:100px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+  .fc-mastery-bar i{display:block;height:100%;background:linear-gradient(90deg,#ef4444,#eab308,#22c55e);border-radius:3px;transition:width .4s;}
+  .fc-card{position:relative;background:var(--card);border:1px solid var(--border);border-radius:20px;padding:40px 32px;min-height:340px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;cursor:pointer;transition:transform .2s;overflow:hidden;}
+  .fc-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,var(--blue),#7c3aed);}
+  .fc-card.back::before{background:linear-gradient(180deg,#22c55e,#0ea5e9);}
+  .fc-card:active{transform:scale(.99);}
+  .fc-label{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:20px;}
+  .fc-card.back .fc-label{color:#22c55e;}
+  .fc-q{font-size:18px;line-height:1.6;color:var(--ink);max-width:100%;word-wrap:break-word;}
+  .fc-answer-box{margin-top:24px;width:100%;background:var(--bg);border-radius:12px;padding:16px 18px;text-align:left;font-size:15px;line-height:1.6;}
+  .fc-answer-box .fc-a-letter{display:inline-block;width:28px;height:28px;line-height:28px;text-align:center;background:#22c55e;color:#fff;border-radius:50%;font-weight:700;margin-right:10px;font-size:13px;vertical-align:middle;}
+  .fc-why{margin-top:14px;font-size:14px;line-height:1.6;color:var(--muted);text-align:left;width:100%;}
+  .fc-tap-hint{margin-top:20px;font-size:12px;color:var(--muted);}
+  .fc-rate-hd{font-size:13px;font-weight:600;color:var(--muted);text-align:center;margin:24px 0 10px;letter-spacing:.3px;}
+  .fc-rate{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+  .fc-rate button{padding:14px 4px 10px;border:2px solid var(--border);background:var(--card);border-radius:12px;font-family:inherit;font-size:20px;font-weight:700;cursor:pointer;transition:all .15s;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .fc-rate button small{font-size:10px;font-weight:500;color:var(--muted);letter-spacing:.3px;}
+  .fc-rate button:hover{transform:translateY(-2px);}
+  .fc-r1{border-color:#ef4444 !important;} .fc-r1:hover{background:rgba(239,68,68,.1);}
+  .fc-r2{border-color:#f97316 !important;} .fc-r2:hover{background:rgba(249,115,22,.1);}
+  .fc-r3{border-color:#eab308 !important;} .fc-r3:hover{background:rgba(234,179,8,.1);}
+  .fc-r4{border-color:#84cc16 !important;} .fc-r4:hover{background:rgba(132,204,22,.1);}
+  .fc-r5{border-color:#22c55e !important;} .fc-r5:hover{background:rgba(34,197,94,.1);}
+  .fc-done{text-align:center;padding:40px 20px;}
+  .fc-done h2{font-size:24px;margin-bottom:12px;color:var(--ink);}
+  .fc-done p{color:var(--muted);margin-bottom:6px;font-size:15px;}
+  .fc-done .fc-mastery-big{font-size:44px;font-weight:800;color:#22c55e;margin:12px 0 4px;}
+  @media(max-width:500px){
+    .fc-card{padding:28px 20px;min-height:280px;}
+    .fc-q{font-size:16px;}
+    .fc-rate{gap:5px;}
+    .fc-rate button{padding:10px 2px 8px;font-size:18px;}
+    .fc-rate button small{font-size:9px;}
+  }
   .mcard{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px 15px;cursor:pointer;text-align:left;font-family:inherit;color:var(--ink);width:100%;display:block;}
   .mcard:hover{border-color:var(--blue);}
   .mcard .row1{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
@@ -1973,7 +2011,8 @@ var MICON={
   sparkle:'<path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/>',
   flag:'<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
   xmark:'<path d="M18 6L6 18M6 6l12 12"/>',
-  shuffle:'<path d="M16 3h5v5M4 20l17-17M21 16v5h-5M15 15l6 6M4 4l5 5"/>'
+  shuffle:'<path d="M16 3h5v5M4 20l17-17M21 16v5h-5M15 15l6 6M4 4l5 5"/>',
+  card:'<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M7 3h10M5 10h14"/>'
 };
 function micon(n){return '<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">'+(MICON[n]||'')+'</svg>';}
 function showMenu(){
@@ -2098,6 +2137,8 @@ function showMenu(){
   var _mixCount=(function(){var seen={},n=0;collectFlagged().concat(collectWrong()).forEach(function(x){if(!seen[x.ref]){seen[x.ref]=1;n++;}});return n;})();
   tiles.push('<button class="mtile" id="mixBtn"'+(_mixCount?'':' disabled style="opacity:.5;cursor:default"')+'><span class="ic">'+micon('shuffle')+'</span><span class="nm">Mix &amp; shuffle</span>'+
     '<span class="sub'+(_mixCount?' warn':'')+'">'+(_mixCount?_mixCount+' wrong + flagged':'nothing to mix')+'</span></button>');
+  tiles.push('<button class="mtile" id="fcBtn"'+(_wrongCount?'':' disabled style="opacity:.5;cursor:default"')+'><span class="ic">'+micon('card')+'</span><span class="nm">Flashcards</span>'+
+    '<span class="sub'+(_wrongCount?' warn':'')+'">'+(_wrongCount?(fcMasteryPct()+'% mastered · '+_wrongCount+' cards'):'no cards yet')+'</span></button>');
   tiles.push('<button class="mtile" id="dashBtn"><span class="ic">'+micon('chart')+'</span><span class="nm">Performance</span><span class="sub">by unit</span></button>');
   html+='<div class="mgrouphd"><span>Reference</span></div><div class="mgrid4">'+tiles.join('')+'</div>';
 
@@ -2126,6 +2167,7 @@ function showMenu(){
   var _fbn=document.getElementById('flaggedBtn'); if(_fbn&&_flagCount)_fbn.onclick=startFlaggedReview;
   var _wbn=document.getElementById('wrongBtn'); if(_wbn&&_wrongCount)_wbn.onclick=startWrongReview;
   var _mbn=document.getElementById('mixBtn'); if(_mbn&&_mixCount)_mbn.onclick=startShuffledWrongFlagged;
+  var _fcbn=document.getElementById('fcBtn'); if(_fcbn&&_wrongCount)_fcbn.onclick=startFlashcards;
   document.getElementById('dashBtn').onclick=showDashboard;
   var mb=document.getElementById('mcqBtn'); if(mb)mb.onclick=mcqChapterList;
   var xb=document.getElementById('xtraBtn'); if(xb)xb.onclick=extraList;
@@ -2503,6 +2545,164 @@ function startShuffledWrongFlagged(){
   st=makeState(QUESTIONS.length,QUESTIONS,true,'practice'); // shuffle answer options too
   st.review=true; pos=0;
   enterQuiz();
+}
+
+// ---------- Flashcards (Brainscape-style Confidence-Based Repetition) ----------
+// Each card has a 1-5 confidence rating. Ratings persist in localStorage and sync via Supabase.
+// Cards with lower ratings appear more often; a "mastery %" reflects average confidence.
+// Session default: 10 cards per session, weighted selection favoring low-confidence.
+var FC_RATINGS_KEY='ea3quiz_v2_fcRatings';
+var FC_SESSION_SIZE=10;
+var FC_DECK=[], FC_POS=0, FC_REVEALED=false;
+
+function loadFcRatings(){
+  try{ return JSON.parse(localStorage.getItem(FC_RATINGS_KEY))||{}; }catch(e){ return {}; }
+}
+function saveFcRatings(r){
+  try{ localStorage.setItem(FC_RATINGS_KEY, JSON.stringify(r)); }catch(e){}
+}
+function setFcRating(ref, rating){
+  var r=loadFcRatings();
+  r[ref]={ r:rating, t:Date.now() };
+  saveFcRatings(r);
+}
+// Mastery for the current part = avg confidence across all wrong questions that have ratings.
+// Unrated cards count as 0 (haven't learned yet).
+function fcMasteryPct(){
+  var wrong=collectWrong();
+  if(!wrong.length) return 0;
+  var r=loadFcRatings();
+  var total=0;
+  wrong.forEach(function(w){
+    var entry=r[w.ref];
+    total += entry ? entry.r : 0;
+  });
+  // Max possible = wrong.length * 5. Scale to 0-100.
+  return Math.round((total / (wrong.length * 5)) * 100);
+}
+// Weighted random selection: cards with lower confidence get higher weight.
+// Unrated cards get medium-high weight (want to see them, but not before struggling ones).
+function pickWeightedDeck(pool, ratings, size){
+  var weighted=pool.map(function(item){
+    var entry=ratings[item.ref];
+    var confidence=entry ? entry.r : 0;
+    // Weight: rating 1 -> 6, 2 -> 5, 3 -> 4, 4 -> 3, 5 -> 2, unrated (0) -> 5
+    var weight = confidence===0 ? 5 : (7 - confidence);
+    return {item:item, weight:weight};
+  });
+  // Weighted sample without replacement
+  var picked=[];
+  var pickCount=Math.min(size, weighted.length);
+  for(var i=0;i<pickCount;i++){
+    var totalW=weighted.reduce(function(t,x){return t+x.weight;},0);
+    var roll=Math.random()*totalW;
+    var idx=0;
+    for(var j=0;j<weighted.length;j++){
+      roll -= weighted[j].weight;
+      if(roll<=0){ idx=j; break; }
+    }
+    picked.push(weighted[idx].item);
+    weighted.splice(idx,1);
+  }
+  return picked;
+}
+
+function startFlashcards(){
+  var wrong=collectWrong();
+  if(!wrong.length){ alert('No wrong questions yet — flashcards appear here once you have some to review.'); return; }
+  var ratings=loadFcRatings();
+  FC_DECK=pickWeightedDeck(wrong, ratings, FC_SESSION_SIZE);
+  FC_POS=0;
+  FC_REVEALED=false;
+  renderFlashcard();
+}
+function renderFlashcard(){
+  side.classList.remove('active','open'); document.body.classList.remove('inquiz'); stopTimer(); stopClock();
+  markView('flashcards');
+  setFloatBack(function(){ if(confirm('Exit flashcards? Your ratings are saved.'))showMenu(); }, '← Exit');
+  document.getElementById('counter').textContent='Flashcards — '+PARTS[PART].name;
+  document.getElementById('score').textContent='';
+  document.getElementById('prog').style.width=Math.round((FC_POS/FC_DECK.length)*100)+'%';
+
+  var mastery=fcMasteryPct();
+
+  // Session complete
+  if(FC_POS>=FC_DECK.length){
+    var newMastery=fcMasteryPct();
+    card.innerHTML='<div class="fc-wrap"><div class="fc-done">'+
+      '<h2>🎯 Session complete</h2>'+
+      '<p>You reviewed '+FC_DECK.length+' card'+(FC_DECK.length===1?'':'s')+'.</p>'+
+      '<div class="fc-mastery-big">'+newMastery+'%</div>'+
+      '<p style="font-size:13px">overall mastery</p>'+
+      '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:24px">'+
+        '<button class="mpill" id="fcRestart" style="padding:10px 18px">Start another session</button>'+
+        '<button class="mpill" id="fcExit" style="padding:10px 18px">Back to menu</button>'+
+      '</div></div></div>';
+    document.getElementById('fcRestart').onclick=startFlashcards;
+    document.getElementById('fcExit').onclick=showMenu;
+    return;
+  }
+
+  var item=FC_DECK[FC_POS];
+  var q=item.q;
+  var correctLetter=String.fromCharCode(65+q.a);
+  var correctText=q.opts[q.a];
+  var why=q.why||'';
+  var currentRating=(loadFcRatings()[item.ref]||{}).r || 0;
+
+  var html='<div class="fc-wrap">'+
+    '<div class="fc-topbar">'+
+      '<span>Card '+(FC_POS+1)+' of '+FC_DECK.length+'</span>'+
+      '<span class="fc-mastery" title="Overall mastery across all wrong questions"><span>Mastery</span>'+
+        '<span class="fc-mastery-bar"><i style="width:'+mastery+'%"></i></span>'+
+        '<b style="color:var(--ink)">'+mastery+'%</b>'+
+      '</span>'+
+    '</div>'+
+    '<div class="fc-card '+(FC_REVEALED?'back':'')+'" id="fcCard">';
+
+  if(!FC_REVEALED){
+    html+='<div class="fc-label">Question</div>'+
+      '<div class="fc-q">'+esc(q.q)+'</div>'+
+      '<div class="fc-tap-hint">Tap to reveal answer</div>';
+  } else {
+    html+='<div class="fc-label">Answer</div>'+
+      '<div class="fc-q">'+esc(q.q)+'</div>'+
+      '<div class="fc-answer-box"><span class="fc-a-letter">'+correctLetter+'</span>'+esc(correctText)+'</div>'+
+      (why?'<div class="fc-why">'+esc(why)+'</div>':'');
+  }
+  html+='</div>';
+
+  if(FC_REVEALED){
+    html+='<div class="fc-rate-hd">How well did you know it?</div>'+
+      '<div class="fc-rate">'+
+        '<button class="fc-r1" data-r="1">1<small>No clue</small></button>'+
+        '<button class="fc-r2" data-r="2">2<small>Barely</small></button>'+
+        '<button class="fc-r3" data-r="3">3<small>Kinda</small></button>'+
+        '<button class="fc-r4" data-r="4">4<small>Pretty sure</small></button>'+
+        '<button class="fc-r5" data-r="5">5<small>Know it cold</small></button>'+
+      '</div>';
+    if(currentRating){
+      html+='<p style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">Last rating: <b>'+currentRating+'/5</b></p>';
+    }
+  }
+  html+='</div>';
+  card.innerHTML=html;
+
+  var fcCard=document.getElementById('fcCard');
+  if(fcCard && !FC_REVEALED){
+    fcCard.onclick=function(){ FC_REVEALED=true; renderFlashcard(); };
+  }
+  card.querySelectorAll('[data-r]').forEach(function(b){
+    b.onclick=function(e){
+      e.stopPropagation();
+      var rating=+b.dataset.r;
+      var current=FC_DECK[FC_POS];
+      setFcRating(current.ref, rating);
+      FC_POS++;
+      FC_REVEALED=false;
+      renderFlashcard();
+    };
+  });
 }
 // ---------- quiz ----------
 function enterQuiz(){
