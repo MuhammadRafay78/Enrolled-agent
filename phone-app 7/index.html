@@ -291,7 +291,7 @@
   .mgrouphd button{border:none;background:none;color:var(--muted);font-size:12px;cursor:pointer;font-family:inherit;padding:0;}
   .mgrouphd button:hover{color:var(--blue);}
   .mgrid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:20px;}
-  .mgrid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px;}
+  .mgrid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px;}
   .mcard{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px 15px;cursor:pointer;text-align:left;font-family:inherit;color:var(--ink);width:100%;display:block;}
   .mcard:hover{border-color:var(--blue);}
   .mcard .row1{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
@@ -1958,7 +1958,10 @@ var MICON={
   loop:'<path d="M17 2l4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="M7 22l-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/>',
   chart:'<path d="M3 3v18h18"/><path d="M7 16v-5M12 16V8M17 16v-8"/>',
   user:'<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
-  sparkle:'<path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/>'
+  sparkle:'<path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/>',
+  flag:'<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
+  xmark:'<path d="M18 6L6 18M6 6l12 12"/>',
+  shuffle:'<path d="M16 3h5v5M4 20l17-17M21 16v5h-5M15 15l6 6M4 4l5 5"/>'
 };
 function micon(n){return '<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">'+(MICON[n]||'')+'</svg>';}
 function showMenu(){
@@ -2074,6 +2077,15 @@ function showMenu(){
   }
   tiles.push('<button class="mtile" id="reviewBtn"'+(due.length?'':' disabled style="opacity:.5;cursor:default"')+'><span class="ic">'+micon('loop')+'</span><span class="nm">Smart review</span>'+
     '<span class="sub'+(due.length?' warn':'')+'">'+(due.length?due.length+' due':'nothing due')+'</span></button>');
+  var _flagCount=collectFlagged().length, _wrongCount=collectWrong().length;
+  tiles.push('<button class="mtile" id="flaggedBtn"'+(_flagCount?'':' disabled style="opacity:.5;cursor:default"')+'><span class="ic">'+micon('flag')+'</span><span class="nm">Flagged</span>'+
+    '<span class="sub'+(_flagCount?' warn':'')+'">'+(_flagCount?_flagCount+' to review':'none flagged')+'</span></button>');
+  tiles.push('<button class="mtile" id="wrongBtn"'+(_wrongCount?'':' disabled style="opacity:.5;cursor:default"')+'><span class="ic">'+micon('xmark')+'</span><span class="nm">Wrong</span>'+
+    '<span class="sub'+(_wrongCount?' warn':'')+'">'+(_wrongCount?_wrongCount+' to retry':'none wrong')+'</span></button>');
+  // Shuffled wrong + flagged (deduped)
+  var _mixCount=(function(){var seen={},n=0;collectFlagged().concat(collectWrong()).forEach(function(x){if(!seen[x.ref]){seen[x.ref]=1;n++;}});return n;})();
+  tiles.push('<button class="mtile" id="mixBtn"'+(_mixCount?'':' disabled style="opacity:.5;cursor:default"')+'><span class="ic">'+micon('shuffle')+'</span><span class="nm">Mix &amp; shuffle</span>'+
+    '<span class="sub'+(_mixCount?' warn':'')+'">'+(_mixCount?_mixCount+' wrong + flagged':'nothing to mix')+'</span></button>');
   tiles.push('<button class="mtile" id="dashBtn"><span class="ic">'+micon('chart')+'</span><span class="nm">Performance</span><span class="sub">by unit</span></button>');
   html+='<div class="mgrouphd"><span>Reference</span></div><div class="mgrid4">'+tiles.join('')+'</div>';
 
@@ -2099,6 +2111,9 @@ function showMenu(){
   card.querySelectorAll('[data-e]').forEach(function(b){b.onclick=function(){startFlow(+b.dataset.e);};});
   card.querySelectorAll('[data-r]').forEach(function(b){b.onclick=function(ev){ev.stopPropagation();resetExam(+b.dataset.r);};});
   const rb=document.getElementById('reviewBtn'); if(due.length)rb.onclick=startReview;
+  var _fbn=document.getElementById('flaggedBtn'); if(_fbn&&_flagCount)_fbn.onclick=startFlaggedReview;
+  var _wbn=document.getElementById('wrongBtn'); if(_wbn&&_wrongCount)_wbn.onclick=startWrongReview;
+  var _mbn=document.getElementById('mixBtn'); if(_mbn&&_mixCount)_mbn.onclick=startShuffledWrongFlagged;
   document.getElementById('dashBtn').onclick=showDashboard;
   var mb=document.getElementById('mcqBtn'); if(mb)mb.onclick=mcqChapterList;
   var xb=document.getElementById('xtraBtn'); if(xb)xb.onclick=extraList;
@@ -2148,20 +2163,50 @@ function renderSearch(term){
   const box=document.getElementById('sres');
   term=(term||'').trim().toLowerCase();
   if(term.length<3){box.innerHTML='';return;}
-  const match=function(q){return q.q.toLowerCase().includes(term)||q.topic.toLowerCase().includes(term)||q.unit.toLowerCase().includes(term);};
+  const match=function(q){return q.q.toLowerCase().includes(term)||(q.topic||'').toLowerCase().includes(term)||(q.unit||'').toLowerCase().includes(term);};
   const hits=[];
+  const MAX_HITS=200;
   EXAMS.forEach(function(ex,e){ex.questions.forEach(function(q,i){
-    if(hits.length>=60)return;
+    if(hits.length>=MAX_HITS)return;
     if(match(q))hits.push({kind:'mock',e:e,i:i,q:q,label:'Mock '+(e+1)+' · Q'+(i+1)});
   });});
   MCQS.forEach(function(mc,mi){mc.questions.forEach(function(q,i){
-    if(hits.length>=60)return;
+    if(hits.length>=MAX_HITS)return;
     if(match(q))hits.push({kind:'mcq',e:mi,i:i,q:q,label:'MCQ Ch'+mc.n+' · Q'+(i+1)});
   });});
-  box.innerHTML=hits.length?hits.map(function(h){
-    return '<button class="sitem" data-k="'+h.kind+'" data-se="'+h.e+'" data-si="'+h.i+'"><b>'+h.label+'</b> <span class="stopic">'+h.q.topic+'</span><br><span class="ssnip">'+h.q.q.slice(0,110)+'…</span></button>';
-  }).join('')+'<div style="height:14px"></div>':'<p style="color:var(--muted);font-size:13px;margin-bottom:14px">No matches.</p>';
-  box.querySelectorAll('.sitem').forEach(function(b){b.onclick=function(){b.dataset.k==='mcq'?jumpMcq(+b.dataset.se,+b.dataset.si):jumpTo(+b.dataset.se,+b.dataset.si);};});
+  XTRA.forEach(function(g,xi){g.questions.forEach(function(q,i){
+    if(hits.length>=MAX_HITS)return;
+    if(match(q))hits.push({kind:'xtra',e:xi,i:i,q:q,label:esc(g.name)+' · Q'+(i+1)});
+  });});
+  if(!hits.length){box.innerHTML='<p style="color:var(--muted);font-size:13px;margin-bottom:14px">No matches.</p>';return;}
+  var header='<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin:4px 0 10px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:10px;">'+
+    '<span style="font-size:13px;color:var(--muted)"><b style="color:var(--ink)">'+hits.length+(hits.length>=MAX_HITS?'+':'')+'</b> matching '+(hits.length===1?'question':'questions')+' found</span>'+
+    '<button class="mpill" id="attemptSearchBtn" style="background:var(--blue-bg,rgba(37,99,235,.1));color:var(--blue);border-color:var(--blue);font-weight:600">✦ Attempt all '+hits.length+'</button>'+
+    '</div>';
+  box.innerHTML=header+hits.map(function(h){
+    return '<button class="sitem" data-k="'+h.kind+'" data-se="'+h.e+'" data-si="'+h.i+'"><b>'+h.label+'</b> <span class="stopic">'+esc(h.q.topic||'')+'</span><br><span class="ssnip">'+esc(h.q.q.slice(0,110))+'…</span></button>';
+  }).join('')+'<div style="height:14px"></div>';
+  box.querySelectorAll('.sitem').forEach(function(b){b.onclick=function(){
+    if(b.dataset.k==='mcq')jumpMcq(+b.dataset.se,+b.dataset.si);
+    else if(b.dataset.k==='xtra'){startExtra(+b.dataset.se); pos=st.order.indexOf(+b.dataset.si); if(pos<0)pos=0; renderSide(); render();}
+    else jumpTo(+b.dataset.se,+b.dataset.si);
+  };});
+  var asb=document.getElementById('attemptSearchBtn');
+  if(asb)asb.onclick=function(){startSearchQuiz(hits, term);};
+}
+function startSearchQuiz(hits, term){
+  if(!hits||!hits.length)return;
+  exam=-8;
+  QUESTIONS=hits.map(function(h){return h.q;});
+  REVIEW_REFS=hits.map(function(h){
+    if(h.kind==='mock')return 'm'+h.e+'_'+h.i;
+    if(h.kind==='mcq')return 'mcq'+h.e+'_'+h.i;
+    return 'xtra'+h.e+'_'+h.i;
+  });
+  window._searchQuizTerm = term || '';
+  st=makeState(QUESTIONS.length,QUESTIONS,false,'practice');
+  st.review=true; pos=0;
+  enterQuiz();
 }
 function jumpTo(e,qi){
   let s=loadState(e);
@@ -2370,6 +2415,83 @@ function startReview(){
   pos=0;
   enterQuiz();
 }
+// Gather questions across all sources in the current PART matching a predicate.
+// Returns array of {q, ref}.
+function gatherAcrossPart(matchFn){
+  var out=[];
+  // Mocks + practice exam
+  EXAMS.forEach(function(ex,e){
+    var s=loadState(e); if(!s)return;
+    ex.questions.forEach(function(q,i){
+      if(matchFn(s,i,q)) out.push({q:q, ref:'m'+e+'_'+i});
+    });
+  });
+  // Chapter question sets
+  MCQS.forEach(function(mc,mi){
+    var s=mcqState(mi); if(!s)return;
+    mc.questions.forEach(function(q,i){
+      if(matchFn(s,i,q)) out.push({q:q, ref:'mcq'+mi+'_'+i});
+    });
+  });
+  // Extra question sets
+  XTRA.forEach(function(g,xi){
+    var s=xState(xi); if(!s)return;
+    g.questions.forEach(function(q,i){
+      if(matchFn(s,i,q)) out.push({q:q, ref:'xtra'+xi+'_'+i});
+    });
+  });
+  return out;
+}
+function collectFlagged(){
+  return gatherAcrossPart(function(s,i){ return s.flags && s.flags[i]===true; });
+}
+function collectWrong(){
+  return gatherAcrossPart(function(s,i,q){
+    return s.answers && s.answers[i]!==null && s.answers[i]!==undefined && s.answers[i]!==q.a;
+  });
+}
+function startFlaggedReview(){
+  var items=collectFlagged();
+  if(!items.length){ alert('No flagged questions in this Part yet. Flag questions using the ⚑ button while answering.'); return; }
+  exam=-6;
+  QUESTIONS=items.map(function(d){return d.q;});
+  REVIEW_REFS=items.map(function(d){return d.ref;});
+  st=makeState(QUESTIONS.length,QUESTIONS,false,'practice');
+  st.review=true; pos=0;
+  enterQuiz();
+}
+function startWrongReview(){
+  var items=collectWrong();
+  if(!items.length){ alert('No wrong answers in this Part yet. Attempt some questions first!'); return; }
+  exam=-7;
+  QUESTIONS=items.map(function(d){return d.q;});
+  REVIEW_REFS=items.map(function(d){return d.ref;});
+  st=makeState(QUESTIONS.length,QUESTIONS,false,'practice');
+  st.review=true; pos=0;
+  enterQuiz();
+}
+function startShuffledWrongFlagged(){
+  var flagged=collectFlagged();
+  var wrong=collectWrong();
+  // Deduplicate by ref so questions that are BOTH wrong AND flagged aren't repeated
+  var seen={};
+  var combined=[];
+  flagged.concat(wrong).forEach(function(item){
+    if(!seen[item.ref]){ seen[item.ref]=true; combined.push(item); }
+  });
+  if(!combined.length){ alert('Nothing to shuffle — no flagged or wrong questions in this Part yet.'); return; }
+  // Fisher-Yates shuffle
+  for(var i=combined.length-1;i>0;i--){
+    var j=Math.floor(Math.random()*(i+1));
+    var tmp=combined[i]; combined[i]=combined[j]; combined[j]=tmp;
+  }
+  exam=-9;
+  QUESTIONS=combined.map(function(d){return d.q;});
+  REVIEW_REFS=combined.map(function(d){return d.ref;});
+  st=makeState(QUESTIONS.length,QUESTIONS,true,'practice'); // shuffle answer options too
+  st.review=true; pos=0;
+  enterQuiz();
+}
 // ---------- quiz ----------
 function enterQuiz(){
   side.classList.add('active');side.classList.remove('open');document.body.classList.add('inquiz');
@@ -2382,7 +2504,7 @@ function headerScore(){
   const c=counts();
   document.getElementById('score').textContent='Score: '+c.right+'/'+c.ans;
 }
-function examName(){return exam===-2?'Smart Review':(exam===-3?UNITS[CHAP].name:(exam===-4?MCQS[MCH].name:(exam===-5?XTRA[XCH].name:EXAMS[exam].name)));}
+function examName(){return exam===-2?'Smart Review':(exam===-3?UNITS[CHAP].name:(exam===-4?MCQS[MCH].name:(exam===-5?XTRA[XCH].name:(exam===-6?'Flagged Questions':(exam===-7?'Wrong Questions':(exam===-8?('Search: "'+(window._searchQuizTerm||'')+'"'):(exam===-9?'Wrong + Flagged (Shuffled)':EXAMS[exam].name)))))));}
 function renderSide(){
   const c=counts();
   const fb=feedbackOn();
@@ -3644,6 +3766,13 @@ __boot();
     input.style.height = Math.min(input.scrollHeight, 100) + 'px';
   });
 
+  // Self-heal: if the current user is an admin, clear any stale rate-limit counter
+  try {
+    if (typeof isAdminUser === 'function' && isAdminUser()) {
+      localStorage.removeItem('ea3quiz_v2_aiUsage');
+    }
+  } catch(e) {}
+
   // Minimal markdown → HTML renderer (safe: escapes HTML first)
   function renderMarkdown(text) {
     // Escape HTML
@@ -3703,10 +3832,9 @@ __boot();
     const q = input.value.trim();
     if (!q) return;
 
-    // ---- Rate limit: 30/day for all users, unlimited for Rafay ----
-    var currentUser = '';
-    try { currentUser = ((typeof auth === 'function' && auth()) || {}).name || ''; } catch(e) {}
-    var isRafay = /^rafay$/i.test(currentUser.trim());
+    // ---- Rate limit: 30/day for regular users, unlimited for admins (Rafay, etc.) ----
+    var isAdmin = false;
+    try { isAdmin = (typeof isAdminUser === 'function') && isAdminUser(); } catch(e) {}
     var AI_USAGE_KEY = 'ea3quiz_v2_aiUsage';
     var DAILY_LIMIT = 30;
     function todayEst(){
@@ -3716,7 +3844,7 @@ __boot();
     function readUsage(){
       try{return JSON.parse(localStorage.getItem(AI_USAGE_KEY))||{};}catch(e){return {};}
     }
-    if (!isRafay) {
+    if (!isAdmin) {
       var usage = readUsage();
       var used = usage[todayEst()] || 0;
       if (used >= DAILY_LIMIT) {
@@ -3738,8 +3866,8 @@ __boot();
     sendBtn.disabled = true;
     const typing = addTyping();
 
-    // Increment usage counter (for non-Rafay users)
-    if (!isRafay) {
+    // Increment usage counter (for non-admin users)
+    if (!isAdmin) {
       try {
         var u = readUsage();
         var k = todayEst();
