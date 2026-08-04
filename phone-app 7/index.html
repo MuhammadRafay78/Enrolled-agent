@@ -2033,12 +2033,19 @@ function showMenu(){
 
   // ---- rolled-up progress for the whole part ----
   var ansAll=0,rightAll=0,unitAgg={};
+  function isValidUnit(u){
+    // Only include units that follow the "SU N: Title" format
+    // Filter out: empty, "Domain X", "SU 0" (uncategorized), "Uncategorized", etc.
+    if(!u) return false;
+    return /^SU \d+:/i.test(u) && !/uncategor/i.test(u) && !/^SU 0/i.test(u);
+  }
   function fold(qs,answers){
     if(!answers)return;
     answers.forEach(function(v,j){
       if(v===null||v===undefined||!qs[j])return;
       ansAll++; var ok=(v===qs[j].a); if(ok)rightAll++;
-      var u=qs[j].unit||'—';
+      var u=qs[j].unit||'';
+      if(!isValidUnit(u)) return; // skip mistagged questions from unit breakdown
       unitAgg[u]=unitAgg[u]||{a:0,r:0}; unitAgg[u].a++; if(ok)unitAgg[u].r++;
     });
   }
@@ -2049,7 +2056,7 @@ function showMenu(){
   });
   MCQS.forEach(function(mc,i){var s=mcqState(i);if(s)fold(mc.questions,s.answers);});
   (XTRA||[]).forEach(function(g,i){var sx=xState(i);if(sx)fold(g.questions,sx.answers);});
-  if(BOOKQ[PART]){var bs=bqState();Object.keys(BOOKQ[PART]).forEach(function(n){var qs=BOOKQ[PART][n];qs.forEach(function(q,i){var v=bs[n+':'+i];if(v!==undefined&&v!==null){ansAll++;var ok=(v===q.a);if(ok)rightAll++;var u=q.unit||'—';unitAgg[u]=unitAgg[u]||{a:0,r:0};unitAgg[u].a++;if(ok)unitAgg[u].r++;}});});}
+  if(BOOKQ[PART]){var bs=bqState();Object.keys(BOOKQ[PART]).forEach(function(n){var qs=BOOKQ[PART][n];qs.forEach(function(q,i){var v=bs[n+':'+i];if(v!==undefined&&v!==null){ansAll++;var ok=(v===q.a);if(ok)rightAll++;var u=q.unit||'';if(isValidUnit(u)){unitAgg[u]=unitAgg[u]||{a:0,r:0};unitAgg[u].a++;if(ok)unitAgg[u].r++;}}});});}
   var pct=ansAll?Math.round(rightAll/ansAll*100):0;
   var weakest=null;
   Object.keys(unitAgg).forEach(function(u){
@@ -3712,12 +3719,21 @@ function showDashboard(){
   document.getElementById('score').textContent='';
   document.getElementById('prog').style.width='0%';
   const units={},topics={};let tA=0,tR=0;
+  const isValidUnit=function(u){
+    // Only count units in "SU N: Title" format (not "Domain X", "SU 0", or "Uncategorized")
+    if(!u) return false;
+    return /^SU \d+:/i.test(u) && !/uncategor/i.test(u) && !/^SU 0/i.test(u);
+  };
   const fold=function(qs,ans){
     qs.forEach(function(q,i){
       const v=ans[i];if(v===null||v===undefined)return;
       const r=v===q.a;tA++;if(r)tR++;
-      units[q.unit]=units[q.unit]||{a:0,r:0};units[q.unit].a++;if(r)units[q.unit].r++;
-      topics[q.topic]=topics[q.topic]||{a:0,r:0};topics[q.topic].a++;if(r)topics[q.topic].r++;
+      if(isValidUnit(q.unit)){
+        units[q.unit]=units[q.unit]||{a:0,r:0};units[q.unit].a++;if(r)units[q.unit].r++;
+      }
+      if(q.topic){
+        topics[q.topic]=topics[q.topic]||{a:0,r:0};topics[q.topic].a++;if(r)topics[q.topic].r++;
+      }
     });
   };
   EXAMS.forEach(function(ex,e){const s=loadState(e);if(s)fold(ex.questions,s.answers);});
