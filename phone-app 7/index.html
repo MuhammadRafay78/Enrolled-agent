@@ -1381,15 +1381,9 @@ function claimSession(){
   try{ localStorage.setItem(SESSION_KEY, JSON.stringify({dev:ea_dev_id(), at:Date.now(), name:(auth()||{}).name||''})); }catch(e){}
 }
 function checkSessionOwner(){
-  // Admins can be signed in anywhere; everyone else is limited to a single device at a time.
-  if(!auth() || isAdminUser()) return true;
-  try{
-    var raw=localStorage.getItem(SESSION_KEY);
-    if(!raw) return true;
-    var v=JSON.parse(raw);
-    if(!v || !v.dev) return true;
-    return v.dev===ea_dev_id();
-  }catch(e){ return true; }
+  // Multi-device / multi-tab is allowed for everyone.
+  // Previously restricted non-admins to one device at a time; now unrestricted.
+  return true;
 }
 // ---- Signup approval workflow (admin gates new users) ----
 async function submitApprovalRequest(name, email){
@@ -1459,7 +1453,15 @@ function renderAdminPanel(){
         var appr=((apprResp && apprResp.rows) || []).filter(function(u){ return ADMINS.indexOf(String(u.name||'').toLowerCase().trim())<0; });
         var missing=(pendResp && pendResp.missing) || (apprResp && apprResp.missing);
         var err=(pendResp && pendResp.err) || (apprResp && apprResp.err);
-        var html='<div class="mgrouphd"><span>Admin (Rafay)</span><span>'+pend.length+' pending \u00b7 '+appr.length+' active</span></div>';
+        // Restore expanded state (persists per session)
+        var expanded = sessionStorage.getItem('adminPanelOpen')==='1';
+        var pendCount=pend.length, apprCount=appr.length;
+        var summary='Admin \u00b7 '+apprCount+' active'+(pendCount?' \u00b7 <b style="color:var(--orange,#b45309)">'+pendCount+' pending</b>':'');
+        var html='<div id="adminHeaderBar" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);cursor:pointer;user-select:none;font-size:13px;">'+
+          '<span style="color:var(--muted)">'+summary+'</span>'+
+          '<span id="adminChev" style="color:var(--muted);font-size:12px">'+(expanded?'\u25b2 collapse':'\u25bc expand')+'</span>'+
+          '</div>';
+        html+='<div id="adminBody" style="display:'+(expanded?'block':'none')+';margin-top:10px">';
         if(missing){ html+='<div class="mstat" style="padding:12px 14px;color:var(--muted)">Approvals table not set up in Supabase yet. Run the setup SQL in the Supabase SQL Editor to enable admin approvals.</div>'; }
         else if(err){ html+='<div class="mstat" style="padding:12px 14px;color:var(--red)">Error loading users: '+esc(err)+'</div>'; }
         if(pend.length){
@@ -1484,15 +1486,26 @@ function renderAdminPanel(){
               '</div>';
           });
         }
+        html+='</div>';
         box.innerHTML=html;
+        // Toggle expand/collapse
+        var hdr=document.getElementById('adminHeaderBar');
+        var body=document.getElementById('adminBody');
+        var chev=document.getElementById('adminChev');
+        if(hdr) hdr.onclick=function(){
+          var isOpen = body.style.display!=='none';
+          body.style.display = isOpen?'none':'block';
+          chev.textContent = isOpen?'\u25bc expand':'\u25b2 collapse';
+          sessionStorage.setItem('adminPanelOpen', isOpen?'0':'1');
+        };
         box.querySelectorAll('[data-au-approve]').forEach(function(b){
-          b.onclick=async function(){ b.disabled=true; var ok=await approveUser(b.dataset.auApprove); if(ok){box.remove(); (typeof showParts==='function'?showParts:showMenu)();} else { alert('Approve failed'); b.disabled=false; } };
+          b.onclick=async function(e){ e.stopPropagation(); b.disabled=true; var ok=await approveUser(b.dataset.auApprove); if(ok){box.remove(); (typeof showParts==='function'?showParts:showMenu)();} else { alert('Approve failed'); b.disabled=false; } };
         });
         box.querySelectorAll('[data-au-reject]').forEach(function(b){
-          b.onclick=async function(){ if(!confirm('Reject '+b.dataset.auReject+'?'))return; b.disabled=true; var ok=await rejectUser(b.dataset.auReject); if(ok){box.remove(); (typeof showParts==='function'?showParts:showMenu)();} else { alert('Reject failed'); b.disabled=false; } };
+          b.onclick=async function(e){ e.stopPropagation(); if(!confirm('Reject '+b.dataset.auReject+'?'))return; b.disabled=true; var ok=await rejectUser(b.dataset.auReject); if(ok){box.remove(); (typeof showParts==='function'?showParts:showMenu)();} else { alert('Reject failed'); b.disabled=false; } };
         });
         box.querySelectorAll('[data-au-revoke]').forEach(function(b){
-          b.onclick=async function(){ if(!confirm('Revoke access for '+b.dataset.auRevoke+'? They will be signed out.'))return; b.disabled=true; var ok=await rejectUser(b.dataset.auRevoke); if(ok){box.remove(); (typeof showParts==='function'?showParts:showMenu)();} else { alert('Revoke failed'); b.disabled=false; } };
+          b.onclick=async function(e){ e.stopPropagation(); if(!confirm('Revoke access for '+b.dataset.auRevoke+'? They will be signed out.'))return; b.disabled=true; var ok=await rejectUser(b.dataset.auRevoke); if(ok){box.remove(); (typeof showParts==='function'?showParts:showMenu)();} else { alert('Revoke failed'); b.disabled=false; } };
         });
       })();
     }catch(e){}
