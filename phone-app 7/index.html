@@ -2547,27 +2547,26 @@ function startShuffledWrongFlagged(){
   enterQuiz();
 }
 
-// ---------- Flashcards (Brainscape-style Confidence-Based Repetition) ----------
+// ---------- Flashcards (Brainscape-style Confidence-Based Repetition + AI concept generation) ----------
 // Each card has a 1-5 confidence rating. Ratings persist in localStorage and sync via Supabase.
-// Cards with lower ratings appear more often; a "mastery %" reflects average confidence.
-// Session default: 10 cards per session, weighted selection favoring low-confidence.
+// Content is AI-generated: quiz Q + correct answer + explanation → concept card (front/back).
+// Cached so each card is only generated once per question.
 var FC_RATINGS_KEY='ea3quiz_v2_fcRatings';
+var FC_CONCEPTS_KEY='ea3quiz_v2_fcConcepts';
 var FC_SESSION_SIZE=10;
-var FC_DECK=[], FC_POS=0, FC_REVEALED=false;
+var FC_DECK=[], FC_POS=0, FC_REVEALED=false, FC_HISTORY=[];
+var FC_CURRENT_CONCEPT=null; // { front, back } or null while loading
 
-function loadFcRatings(){
-  try{ return JSON.parse(localStorage.getItem(FC_RATINGS_KEY))||{}; }catch(e){ return {}; }
-}
-function saveFcRatings(r){
-  try{ localStorage.setItem(FC_RATINGS_KEY, JSON.stringify(r)); }catch(e){}
-}
+function loadFcRatings(){ try{return JSON.parse(localStorage.getItem(FC_RATINGS_KEY))||{};}catch(e){return {};} }
+function saveFcRatings(r){ try{localStorage.setItem(FC_RATINGS_KEY,JSON.stringify(r));}catch(e){} }
 function setFcRating(ref, rating){
   var r=loadFcRatings();
-  r[ref]={ r:rating, t:Date.now() };
+  r[ref]={r:rating, t:Date.now()};
   saveFcRatings(r);
 }
-// Mastery for the current part = avg confidence across all wrong questions that have ratings.
-// Unrated cards count as 0 (haven't learned yet).
+function loadFcConcepts(){ try{return JSON.parse(localStorage.getItem(FC_CONCEPTS_KEY))||{};}catch(e){return {};} }
+function saveFcConcepts(c){ try{localStorage.setItem(FC_CONCEPTS_KEY,JSON.stringify(c));}catch(e){} }
+
 function fcMasteryPct(){
   var wrong=collectWrong();
   if(!wrong.length) return 0;
@@ -2577,20 +2576,15 @@ function fcMasteryPct(){
     var entry=r[w.ref];
     total += entry ? entry.r : 0;
   });
-  // Max possible = wrong.length * 5. Scale to 0-100.
   return Math.round((total / (wrong.length * 5)) * 100);
 }
-// Weighted random selection: cards with lower confidence get higher weight.
-// Unrated cards get medium-high weight (want to see them, but not before struggling ones).
 function pickWeightedDeck(pool, ratings, size){
   var weighted=pool.map(function(item){
     var entry=ratings[item.ref];
     var confidence=entry ? entry.r : 0;
-    // Weight: rating 1 -> 6, 2 -> 5, 3 -> 4, 4 -> 3, 5 -> 2, unrated (0) -> 5
     var weight = confidence===0 ? 5 : (7 - confidence);
     return {item:item, weight:weight};
   });
-  // Weighted sample without replacement
   var picked=[];
   var pickCount=Math.min(size, weighted.length);
   for(var i=0;i<pickCount;i++){
@@ -2607,6 +2601,77 @@ function pickWeightedDeck(pool, ratings, size){
   return picked;
 }
 
+// Ask the AI Worker to generate a concept card from a quiz question.
+// Returns { front, back } or null on failure.
+async function generateConceptCard(item){
+  var q=item.q;
+  var correctLetter=String.fromCharCode(65+q.a);
+  var correctText=q.opts[q.a];
+  var why=q.why||'';
+
+  var prompt =
+    'You are creating a flashcard from an IRS Enrolled Agent (EA) exam question. ' +
+    'The multiple-choice format does not work as a flashcard, so you must convert it into a ' +
+    'concept-recall card that teaches the underlying tax rule.\n\n' +
+    'ORIGINAL QUESTION: ' + q.q + '\n' +
+    'CORRECT ANSWER (' + correctLetter + '): ' + correctText + '\n' +
+    (why ? 'EXPLANATION: ' + why + '\n' : '') +
+    '\nRespond with ONLY a JSON object (no markdown, no code fences) in this exact format:\n' +
+    '{"front":"A short concept question (max 20 words) that tests the RULE, not the specific scenario","back":"A clear, complete answer (2-5 sentences) explaining the rule. Reference IRS code sections, forms, or Circular 230 rules by name. Use tax year 2025 figures if numbers are involved."}';
+
+  try {
+    var res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ prompt: prompt })
+    });
+    if(!res.ok || !res.body) return null;
+    var reader=res.body.getReader();
+    var decoder=new TextDecoder();
+    var text='';
+    while(true){
+      var chunk=await reader.read();
+      if(chunk.done)break;
+      text += decoder.decode(chunk.value,{stream:true});
+    }
+    // Strip any stray markdown fences the model might add
+    text = text.replace(/```json\s*|\s*```/g,'').trim();
+    var parsed = JSON.parse(text);
+    if(parsed && parsed.front && parsed.back){
+      return { front: String(parsed.front), back: String(parsed.back) };
+    }
+  } catch(e) { /* fall through */ }
+  return null;
+}
+
+async function ensureConceptForCurrent(){
+  var item=FC_DECK[FC_POS];
+  if(!item) return;
+  var concepts=loadFcConcepts();
+  if(concepts[item.ref]){
+    FC_CURRENT_CONCEPT = concepts[item.ref];
+    return;
+  }
+  FC_CURRENT_CONCEPT = null; // triggers "generating" state in UI
+  renderFlashcard();
+  var generated = await generateConceptCard(item);
+  // If deck moved on, don't overwrite
+  if(!FC_DECK[FC_POS] || FC_DECK[FC_POS].ref !== item.ref) return;
+  if(generated){
+    var c=loadFcConcepts();
+    c[item.ref]=generated;
+    saveFcConcepts(c);
+    FC_CURRENT_CONCEPT = generated;
+  } else {
+    // Fallback: use raw Q+A if AI fails
+    FC_CURRENT_CONCEPT = {
+      front: item.q.q,
+      back: 'Correct answer (' + String.fromCharCode(65+item.q.a) + '): ' + item.q.opts[item.q.a] + (item.q.why?'\n\n'+item.q.why:'')
+    };
+  }
+  renderFlashcard();
+}
+
 function startFlashcards(){
   var wrong=collectWrong();
   if(!wrong.length){ alert('No wrong questions yet — flashcards appear here once you have some to review.'); return; }
@@ -2614,44 +2679,46 @@ function startFlashcards(){
   FC_DECK=pickWeightedDeck(wrong, ratings, FC_SESSION_SIZE);
   FC_POS=0;
   FC_REVEALED=false;
+  FC_HISTORY=[];
+  FC_CURRENT_CONCEPT=null;
+  bindFcKeys();
+  ensureConceptForCurrent();
   renderFlashcard();
 }
+
 function renderFlashcard(){
   side.classList.remove('active','open'); document.body.classList.remove('inquiz'); stopTimer(); stopClock();
   markView('flashcards');
-  setFloatBack(function(){ if(confirm('Exit flashcards? Your ratings are saved.'))showMenu(); }, '← Exit');
+  setFloatBack(function(){ if(confirm('Exit flashcards? Your ratings are saved.')){unbindFcKeys();showMenu();} }, '← Exit');
   document.getElementById('counter').textContent='Flashcards — '+PARTS[PART].name;
   document.getElementById('score').textContent='';
   document.getElementById('prog').style.width=Math.round((FC_POS/FC_DECK.length)*100)+'%';
 
   var mastery=fcMasteryPct();
 
-  // Session complete
   if(FC_POS>=FC_DECK.length){
-    var newMastery=fcMasteryPct();
+    unbindFcKeys();
     card.innerHTML='<div class="fc-wrap"><div class="fc-done">'+
       '<h2>🎯 Session complete</h2>'+
       '<p>You reviewed '+FC_DECK.length+' card'+(FC_DECK.length===1?'':'s')+'.</p>'+
-      '<div class="fc-mastery-big">'+newMastery+'%</div>'+
+      '<div class="fc-mastery-big">'+mastery+'%</div>'+
       '<p style="font-size:13px">overall mastery</p>'+
       '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:24px">'+
         '<button class="mpill" id="fcRestart" style="padding:10px 18px">Start another session</button>'+
         '<button class="mpill" id="fcExit" style="padding:10px 18px">Back to menu</button>'+
       '</div></div></div>';
     document.getElementById('fcRestart').onclick=startFlashcards;
-    document.getElementById('fcExit').onclick=showMenu;
+    document.getElementById('fcExit').onclick=function(){unbindFcKeys();showMenu();};
     return;
   }
 
   var item=FC_DECK[FC_POS];
-  var q=item.q;
-  var correctLetter=String.fromCharCode(65+q.a);
-  var correctText=q.opts[q.a];
-  var why=q.why||'';
   var currentRating=(loadFcRatings()[item.ref]||{}).r || 0;
+  var concept = FC_CURRENT_CONCEPT;
 
   var html='<div class="fc-wrap">'+
     '<div class="fc-topbar">'+
+      '<button class="mpill" id="fcExitTop" title="Exit flashcards (Esc)" style="padding:6px 12px;font-size:13px">← Exit</button>'+
       '<span>Card '+(FC_POS+1)+' of '+FC_DECK.length+'</span>'+
       '<span class="fc-mastery" title="Overall mastery across all wrong questions"><span>Mastery</span>'+
         '<span class="fc-mastery-bar"><i style="width:'+mastery+'%"></i></span>'+
@@ -2660,20 +2727,24 @@ function renderFlashcard(){
     '</div>'+
     '<div class="fc-card '+(FC_REVEALED?'back':'')+'" id="fcCard">';
 
-  if(!FC_REVEALED){
+  if(!concept){
+    // Still generating
+    html+='<div class="fc-label">Generating card…</div>'+
+      '<div class="ai-typing" style="justify-content:center;margin:20px 0"><span></span><span></span><span></span></div>'+
+      '<div class="fc-tap-hint">AI is turning this into a concept card</div>';
+  } else if(!FC_REVEALED){
     html+='<div class="fc-label">Question</div>'+
-      '<div class="fc-q">'+esc(q.q)+'</div>'+
-      '<div class="fc-tap-hint">Tap to reveal answer</div>';
+      '<div class="fc-q">'+esc(concept.front)+'</div>'+
+      '<div class="fc-tap-hint">Tap to reveal · <b>Space</b></div>';
   } else {
     html+='<div class="fc-label">Answer</div>'+
-      '<div class="fc-q">'+esc(q.q)+'</div>'+
-      '<div class="fc-answer-box"><span class="fc-a-letter">'+correctLetter+'</span>'+esc(correctText)+'</div>'+
-      (why?'<div class="fc-why">'+esc(why)+'</div>':'');
+      '<div class="fc-q" style="margin-bottom:16px">'+esc(concept.front)+'</div>'+
+      '<div class="fc-answer-box" style="text-align:left">'+esc(concept.back).replace(/\n/g,'<br>')+'</div>';
   }
   html+='</div>';
 
-  if(FC_REVEALED){
-    html+='<div class="fc-rate-hd">How well did you know it?</div>'+
+  if(FC_REVEALED && concept){
+    html+='<div class="fc-rate-hd">How well did you know it? <span style="opacity:.6">(press 1–5)</span></div>'+
       '<div class="fc-rate">'+
         '<button class="fc-r1" data-r="1">1<small>No clue</small></button>'+
         '<button class="fc-r2" data-r="2">2<small>Barely</small></button>'+
@@ -2682,27 +2753,90 @@ function renderFlashcard(){
         '<button class="fc-r5" data-r="5">5<small>Know it cold</small></button>'+
       '</div>';
     if(currentRating){
-      html+='<p style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">Last rating: <b>'+currentRating+'/5</b></p>';
+      html+='<p style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">Last rating: <b>'+currentRating+'/5</b> · Press <b>R</b> to regenerate this card</p>';
+    } else {
+      html+='<p style="text-align:center;font-size:12px;color:var(--muted);margin-top:12px">Press <b>R</b> to regenerate · <b>←</b> previous</p>';
     }
   }
   html+='</div>';
   card.innerHTML=html;
 
   var fcCard=document.getElementById('fcCard');
-  if(fcCard && !FC_REVEALED){
+  if(fcCard && concept && !FC_REVEALED){
     fcCard.onclick=function(){ FC_REVEALED=true; renderFlashcard(); };
   }
   card.querySelectorAll('[data-r]').forEach(function(b){
-    b.onclick=function(e){
-      e.stopPropagation();
-      var rating=+b.dataset.r;
-      var current=FC_DECK[FC_POS];
-      setFcRating(current.ref, rating);
-      FC_POS++;
-      FC_REVEALED=false;
-      renderFlashcard();
-    };
+    b.onclick=function(e){ e.stopPropagation(); rateCurrentCard(+b.dataset.r); };
   });
+  var _fcExit=document.getElementById('fcExitTop');
+  if(_fcExit)_fcExit.onclick=function(){
+    if(confirm('Exit flashcards? Your ratings are saved.')){ unbindFcKeys(); showMenu(); }
+  };
+}
+
+function rateCurrentCard(rating){
+  var current=FC_DECK[FC_POS];
+  if(!current) return;
+  setFcRating(current.ref, rating);
+  FC_HISTORY.push({pos:FC_POS, concept:FC_CURRENT_CONCEPT});
+  FC_POS++;
+  FC_REVEALED=false;
+  FC_CURRENT_CONCEPT=null;
+  ensureConceptForCurrent();
+  renderFlashcard();
+}
+function fcPrevCard(){
+  if(FC_HISTORY.length===0) return;
+  var last=FC_HISTORY.pop();
+  FC_POS=last.pos;
+  FC_CURRENT_CONCEPT=last.concept;
+  FC_REVEALED=false;
+  renderFlashcard();
+}
+function fcRegenerateCurrent(){
+  var item=FC_DECK[FC_POS]; if(!item) return;
+  var concepts=loadFcConcepts();
+  delete concepts[item.ref];
+  saveFcConcepts(concepts);
+  FC_CURRENT_CONCEPT=null;
+  FC_REVEALED=false;
+  ensureConceptForCurrent();
+  renderFlashcard();
+}
+
+// ---- keyboard shortcuts (only active during flashcard view) ----
+var _fcKeyHandler=null;
+function bindFcKeys(){
+  if(_fcKeyHandler) return;
+  _fcKeyHandler=function(e){
+    // Ignore if typing in an input
+    var tag=(e.target && e.target.tagName)||'';
+    if(tag==='INPUT'||tag==='TEXTAREA') return;
+    // Only active on flashcard view
+    if(document.body.getAttribute('data-view')!=='flashcards') return;
+    if(e.key===' '||e.key==='Spacebar'){
+      e.preventDefault();
+      if(!FC_CURRENT_CONCEPT) return;
+      if(!FC_REVEALED){ FC_REVEALED=true; renderFlashcard(); }
+      else { rateCurrentCard(3); } // Space after reveal = neutral "kinda" and advance
+    } else if(/^[1-5]$/.test(e.key) && FC_REVEALED){
+      e.preventDefault();
+      rateCurrentCard(+e.key);
+    } else if(e.key==='Escape'){
+      e.preventDefault();
+      if(confirm('Exit flashcards? Your ratings are saved.')){ unbindFcKeys(); showMenu(); }
+    } else if(e.key==='ArrowLeft'){
+      e.preventDefault();
+      fcPrevCard();
+    } else if(e.key==='r'||e.key==='R'){
+      e.preventDefault();
+      fcRegenerateCurrent();
+    }
+  };
+  document.addEventListener('keydown', _fcKeyHandler);
+}
+function unbindFcKeys(){
+  if(_fcKeyHandler){ document.removeEventListener('keydown', _fcKeyHandler); _fcKeyHandler=null; }
 }
 // ---------- quiz ----------
 function enterQuiz(){
