@@ -2552,7 +2552,7 @@ function startShuffledWrongFlagged(){
 // Content is AI-generated: quiz Q + correct answer + explanation → concept card (front/back).
 // Cached so each card is only generated once per question.
 var FC_RATINGS_KEY='ea3quiz_v2_fcRatings';
-var FC_CONCEPTS_KEY='ea3quiz_v2_fcConcepts';
+var FC_CONCEPTS_KEY='ea3quiz_v2_fcConcepts_v2'; // v2: book-sourced instead of AI-generated
 var FC_SESSION_SIZE=10;
 var FC_DECK=[], FC_POS=0, FC_REVEALED=false, FC_HISTORY=[];
 var FC_CURRENT_CONCEPT=null; // { front, back } or null while loading
@@ -2601,47 +2601,90 @@ function pickWeightedDeck(pool, ratings, size){
   return picked;
 }
 
-// Ask the AI Worker to generate a concept card from a quiz question.
-// Returns { front, back } or null on failure.
-async function generateConceptCard(item){
-  var q=item.q;
-  var correctLetter=String.fromCharCode(65+q.a);
-  var correctText=q.opts[q.a];
-  var why=q.why||'';
+// Find the most relevant chapter-notes section for a given wrong question.
+// Returns { front, back, source } or null if no match.
+function findBookConcept(item){
+  var q = item.q;
+  if(!CHNOTES[PART] || !q.unit) return null;
 
-  var prompt =
-    'You are creating a flashcard from an IRS Enrolled Agent (EA) exam question. ' +
-    'The multiple-choice format does not work as a flashcard, so you must convert it into a ' +
-    'concept-recall card that teaches the underlying tax rule.\n\n' +
-    'ORIGINAL QUESTION: ' + q.q + '\n' +
-    'CORRECT ANSWER (' + correctLetter + '): ' + correctText + '\n' +
-    (why ? 'EXPLANATION: ' + why + '\n' : '') +
-    '\nRespond with ONLY a JSON object (no markdown, no code fences) in this exact format:\n' +
-    '{"front":"A short concept question (max 20 words) that tests the RULE, not the specific scenario","back":"A clear, complete answer (2-5 sentences) explaining the rule. Reference IRS code sections, forms, or Circular 230 rules by name. Use tax year 2025 figures if numbers are involved."}';
+  // Extract search terms: topic + significant words from the question and correct answer
+  var stop = {the:1,a:1,an:1,is:1,are:1,was:1,were:1,of:1,to:1,in:1,on:1,at:1,for:1,with:1,by:1,and:1,or:1,but:1,not:1,which:1,following:1,what:1,when:1,where:1,who:1,how:1,does:1,do:1,did:1,has:1,have:1,had:1,be:1,been:1,being:1,this:1,that:1,these:1,those:1,it:1,as:1,if:1,then:1,than:1,from:1,into:1,about:1,taxpayer:1,taxpayers:1,any:1,all:1,each:1,every:1,some:1,except:1,following:1,statement:1,statements:1,true:1,false:1};
 
-  try {
-    var res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ prompt: prompt })
+  function tokens(str){
+    return String(str||'').toLowerCase()
+      .replace(/[^a-z0-9§\s]/g,' ')
+      .split(/\s+/)
+      .filter(function(w){ return w.length>2 && !stop[w]; });
+  }
+
+  var qTokens = tokens(q.q + ' ' + (q.topic||'') + ' ' + q.opts[q.a]);
+  if(!qTokens.length) return null;
+  var tokenSet = {};
+  qTokens.forEach(function(t){ tokenSet[t]=(tokenSet[t]||0)+1; });
+
+  // Score every section in the current part's chapter notes
+  var best = null;
+  var C = CHNOTES[PART];
+  Object.keys(C).forEach(function(unitNum){
+    var u = C[unitNum];
+    if(!u || !u.s) return;
+    // Boost score if this section is in the same unit as the question
+    var unitBoost = (String(unitNum) === String(q.unit) || (u.t && q.unit && u.t.toLowerCase().indexOf(String(q.unit).toLowerCase())>=0)) ? 3 : 0;
+    u.s.forEach(function(sec, si){
+      if(!sec.b || !sec.b.length) return;
+      var body = sec.t + ' ' + sec.b.join(' ');
+      var bodyLower = body.toLowerCase();
+      var score = unitBoost;
+      Object.keys(tokenSet).forEach(function(t){
+        // count occurrences (approximate)
+        var re = new RegExp('\\b'+t.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','gi');
+        var matches = bodyLower.match(re);
+        if(matches) score += matches.length;
+      });
+      if(!best || score > best.score){
+        best = { score:score, unit:unitNum, unitTitle:u.t, sec:sec, si:si };
+      }
     });
-    if(!res.ok || !res.body) return null;
-    var reader=res.body.getReader();
-    var decoder=new TextDecoder();
-    var text='';
-    while(true){
-      var chunk=await reader.read();
-      if(chunk.done)break;
-      text += decoder.decode(chunk.value,{stream:true});
-    }
-    // Strip any stray markdown fences the model might add
-    text = text.replace(/```json\s*|\s*```/g,'').trim();
-    var parsed = JSON.parse(text);
-    if(parsed && parsed.front && parsed.back){
-      return { front: String(parsed.front), back: String(parsed.back) };
-    }
-  } catch(e) { /* fall through */ }
-  return null;
+  });
+
+  if(!best || best.score < 3) return null; // require a minimum relevance
+
+  // Format the answer using the actual book section
+  var body = best.sec.b.slice(0, 6).join('\n\n'); // up to 6 paragraphs to keep it focused
+  var back = body;
+  if(best.sec.b.length > 6){
+    back += '\n\n(Additional detail in SU ' + best.unit + ' — see full Chapter Notes)';
+  }
+
+  // Front: Use the topic if available, otherwise a concept-based prompt
+  var front = q.topic
+    ? 'Explain: ' + q.topic
+    : (q.q.length < 120 ? q.q : q.q.slice(0,120)+'…');
+
+  return {
+    front: front,
+    back: back,
+    source: 'SU ' + best.unit + (best.sec.t ? ' — ' + best.sec.t : '')
+  };
+}
+
+// Ask the AI Worker as a fallback ONLY when no book match found.
+// We include the verified question + correct answer + why so it can't invent facts.
+async function generateConceptCard(item){
+  // First try to find it in the book
+  var bookConcept = findBookConcept(item);
+  if(bookConcept) return bookConcept;
+
+  // Fallback: use the verified quiz data as-is (no AI hallucination)
+  var q = item.q;
+  var correctLetter = String.fromCharCode(65+q.a);
+  var back = 'Correct answer (' + correctLetter + '): ' + q.opts[q.a];
+  if(q.why) back += '\n\n' + q.why;
+  return {
+    front: q.topic ? 'Recall: ' + q.topic : q.q,
+    back: back,
+    source: 'From your question bank'
+  };
 }
 
 async function ensureConceptForCurrent(){
@@ -2652,25 +2695,20 @@ async function ensureConceptForCurrent(){
     FC_CURRENT_CONCEPT = concepts[item.ref];
     return;
   }
-  FC_CURRENT_CONCEPT = null; // triggers "generating" state in UI
-  renderFlashcard();
+  // Book lookup is synchronous — no loading state needed
   var generated = await generateConceptCard(item);
-  // If deck moved on, don't overwrite
   if(!FC_DECK[FC_POS] || FC_DECK[FC_POS].ref !== item.ref) return;
   if(generated){
     var c=loadFcConcepts();
     c[item.ref]=generated;
     saveFcConcepts(c);
     FC_CURRENT_CONCEPT = generated;
-  } else {
-    // Fallback: use raw Q+A if AI fails
-    FC_CURRENT_CONCEPT = {
-      front: item.q.q,
-      back: 'Correct answer (' + String.fromCharCode(65+item.q.a) + '): ' + item.q.opts[item.q.a] + (item.q.why?'\n\n'+item.q.why:'')
-    };
   }
   renderFlashcard();
 }
+
+// Preload not needed anymore since book lookup is instant, but keep for API compatibility
+function prefetchUpcoming(){ /* no-op — cards are now instant from book */ }
 
 function startFlashcards(){
   var wrong=collectWrong();
@@ -2739,7 +2777,8 @@ function renderFlashcard(){
   } else {
     html+='<div class="fc-label">Answer</div>'+
       '<div class="fc-q" style="margin-bottom:16px">'+esc(concept.front)+'</div>'+
-      '<div class="fc-answer-box" style="text-align:left">'+esc(concept.back).replace(/\n/g,'<br>')+'</div>';
+      '<div class="fc-answer-box" style="text-align:left">'+esc(concept.back).replace(/\n/g,'<br>')+'</div>'+
+      (concept.source?'<div style="font-size:11px;color:var(--muted);margin-top:12px;text-align:center;letter-spacing:.5px">📘 '+esc(concept.source)+'</div>':'');
   }
   html+='</div>';
 
