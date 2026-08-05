@@ -4108,16 +4108,26 @@ __boot();
     transition:transform .15s;border:none;
   }
   #ai-tutor-btn:hover{transform:scale(1.05);}
+  :root{ --ai-panel-w: 560px; --ai-panel-gap: 24px; }
   #ai-tutor-panel{
-    position:fixed;bottom:24px;right:24px;
-    width:400px;max-width:calc(100vw - 32px);
-    height:600px;max-height:calc(100vh - 48px);
+    position:fixed;top:24px;bottom:24px;right:var(--ai-panel-gap);
+    width:var(--ai-panel-w);max-width:calc(100vw - 32px);
+    height:auto;max-height:none;
     background:var(--card);border:1px solid var(--border);border-radius:12px;
     box-shadow:0 10px 40px rgba(0,0,0,.15);z-index:9999;
     display:none;flex-direction:column;overflow:hidden;
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
     color:var(--ink);
   }
+  /* When the AI panel is open on desktop, shift the quiz content left so it isn't hidden */
+  @media (min-width: 1024px){
+    body.ai-open .wrap{
+      margin-left:32px;
+      margin-right:calc(var(--ai-panel-w) + var(--ai-panel-gap) + 24px);
+      max-width:none;
+    }
+  }
+  .wrap{ transition: margin .18s ease, max-width .18s ease; }
   #ai-tutor-header{
     background:var(--card);color:var(--ink);
     padding:14px 18px;display:flex;justify-content:space-between;align-items:center;
@@ -4131,8 +4141,8 @@ __boot();
   #ai-tutor-close{cursor:pointer;font-size:20px;line-height:1;color:var(--muted);transition:color .2s;}
   #ai-tutor-close:hover{color:var(--ink);}
   #ai-tutor-messages{
-    flex:1;overflow-y:auto;padding:18px;
-    font-size:14px;line-height:1.6;color:var(--ink);
+    flex:1;overflow-y:auto;padding:20px 22px;
+    font-size:15.5px;line-height:1.65;color:var(--ink);
     background:var(--card);
   }
   #ai-tutor-messages::-webkit-scrollbar{width:4px;}
@@ -4251,13 +4261,24 @@ __boot();
   const sendBtn = document.getElementById('ai-tutor-send');
   const messages = document.getElementById('ai-tutor-messages');
 
-  btn.onclick = () => { panel.style.display = 'flex'; btn.style.display = 'none'; panel.classList.remove('minimized'); setTimeout(()=>input.focus(),100); };
-  closeBtn.onclick = (e) => { e.stopPropagation(); panel.style.display = 'none'; btn.style.display = 'flex'; };
+  function _setAiOpen(open){
+    // Only reflow the quiz on wide screens — on mobile the panel takes over the viewport.
+    if(window.innerWidth >= 1024) document.body.classList.toggle('ai-open', open);
+    else document.body.classList.remove('ai-open');
+  }
+  btn.onclick = () => { panel.style.display = 'flex'; btn.style.display = 'none'; panel.classList.remove('minimized'); _setAiOpen(true); setTimeout(()=>input.focus(),100); };
+  closeBtn.onclick = (e) => { e.stopPropagation(); panel.style.display = 'none'; btn.style.display = 'flex'; _setAiOpen(false); };
   // Click header (but not close button) to minimize/expand
   document.getElementById('ai-tutor-header').onclick = () => {
     panel.classList.toggle('minimized');
+    // Minimized = quiz should have its space back
+    _setAiOpen(!panel.classList.contains('minimized'));
     if (!panel.classList.contains('minimized')) setTimeout(()=>input.focus(),100);
   };
+  window.addEventListener('resize', () => {
+    // Re-evaluate reflow when window crosses the 1024px threshold
+    if(panel.style.display === 'flex' && !panel.classList.contains('minimized')) _setAiOpen(true);
+  });
 
   // Auto-grow textarea
   input.addEventListener('input', () => {
@@ -4470,6 +4491,8 @@ __boot();
       if (saved && saved.w && saved.h) {
         panel.style.width = saved.w + 'px';
         panel.style.height = saved.h + 'px';
+        // Also expose to the CSS var so the .wrap reflow uses the restored width
+        document.documentElement.style.setProperty('--ai-panel-w', saved.w + 'px');
       }
     }
   } catch(e) {}
@@ -4491,6 +4514,8 @@ __boot();
     const newH = Math.min(Math.max(400, startH + dy), window.innerHeight - 40);
     panel.style.width = newW + 'px';
     panel.style.height = newH + 'px';
+    // Keep the quiz-reflow in sync while dragging
+    document.documentElement.style.setProperty('--ai-panel-w', newW + 'px');
   });
   document.addEventListener('mouseup', () => {
     if (!resizing) return;
