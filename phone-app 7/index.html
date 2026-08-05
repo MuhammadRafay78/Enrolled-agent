@@ -1628,6 +1628,9 @@ async function syncNow(force){
     PULLED=true; if(!_quiet) setSync('ok');
     try{ kickIfNotOwner(); }catch(e){}
     if(changed){
+      // If the pulled state includes old-Domain-shape extras from another device
+      // still running the older file, translate them into the new Chapter shape here.
+      try{ if(typeof __migrateExtraStateV1==='function') __migrateExtraStateV1(); }catch(e){}
       // Refresh visible surfaces WITHOUT jumping to the other device's view/position.
       // Each device keeps its own current question; sidebar/timer refresh in place.
       try{ if(typeof renderAcct==='function') renderAcct(); }catch(e){}
@@ -3980,14 +3983,18 @@ var __EXTRA_MIGRATION = {"P1":{"0_0":[1,0],"0_1":[1,36],"0_2":[0,27],"0_3":[0,1]
 var __EXTRA_OLD_SIZES = {"P1":[102,256,174,20,25,74],"P2":[354,208,90],"P3":[159,149,117,79]};
 var __EXTRA_NEW_SIZES = {"P1":[42,50,20,67,21,33,48,18,15,29,58,64,67,6,44,25,18,26],"P2":[32,15,20,66,41,21,20,27,26,87,43,72,7,27,59,29,13,18,29],"P3":[54,67,43,31,25,16,27,37,60,40,19,75,10]};
 function __migrateExtraStateV1(){
+  // Runs at boot AND after every successful sync-pull. Idempotent: if there's no
+  // old-shape state, it's a no-op. If new-shape state already exists for a chapter,
+  // we MERGE (don't overwrite) — protects laptop-answered questions from being
+  // wiped when mobile pushes older state via sync.
   try{
-    if(localStorage.getItem('ea3quiz_v2_extra_migration_v1')==='done')return;
+    var changed=false;
     ['P1','P2','P3'].forEach(function(part){
       var pfx = (part==='P3') ? '' : ('p'+part.charAt(1)+'_');
       var oldSizes = __EXTRA_OLD_SIZES[part];
       var newSizes = __EXTRA_NEW_SIZES[part];
       var mig = __EXTRA_MIGRATION[part] || {};
-      // 1. Collect old-shape states
+      // 1. Collect old-shape states (length matches an old domain's size)
       var oldStates = {};
       for(var gi=0; gi<oldSizes.length; gi++){
         var key='ea3quiz_v2_'+pfx+'extra_'+gi;
@@ -4000,8 +4007,23 @@ function __migrateExtraStateV1(){
         oldStates[gi]=s;
       }
       if(Object.keys(oldStates).length===0)return;
-      // 2. Build new-shape aggregated states
+
+      // 2. Read any EXISTING new-shape state so we can merge into it, not overwrite
       var newStates={};
+      for(var nc=0; nc<newSizes.length; nc++){
+        var nkey='ea3quiz_v2_'+pfx+'extra_'+nc;
+        // If a key at this index currently holds NEW-shape state, keep it as the base
+        var nraw=localStorage.getItem(nkey);
+        if(nraw){
+          try{
+            var ns=JSON.parse(nraw);
+            if(ns&&Array.isArray(ns.answers)&&ns.answers.length===newSizes[nc]){
+              newStates[nc]=ns;
+            }
+          }catch(e){}
+        }
+      }
+      // 3. Fold each old answer into the new-shape state at the correct position
       Object.keys(oldStates).forEach(function(gi){
         var s=oldStates[gi];
         s.answers.forEach(function(v, qi){
@@ -4009,10 +4031,10 @@ function __migrateExtraStateV1(){
           var mapKey=gi+'_'+qi;
           var target=mig[mapKey];
           if(!target)return;
-          var nc=target[0], nq=target[1];
-          if(!newStates[nc]){
-            var L=newSizes[nc];
-            newStates[nc]={
+          var ncc=target[0], nq=target[1];
+          if(!newStates[ncc]){
+            var L=newSizes[ncc];
+            newStates[ncc]={
               answers:new Array(L).fill(null),
               flags:new Array(L).fill(false),
               order:Array.from({length:L},function(_,i){return i;}),
@@ -4022,23 +4044,37 @@ function __migrateExtraStateV1(){
               examDone:false
             };
           }
-          newStates[nc].answers[nq]=v;
-          if(Array.isArray(s.flags)&&s.flags[qi]){newStates[nc].flags[nq]=true;}
+          // Merge: don't clobber an existing answer at this position; only fill blanks.
+          // This keeps whatever the user answered on THIS device intact if the same
+          // slot happened to be filled by both devices.
+          if(newStates[ncc].answers[nq]===null||newStates[ncc].answers[nq]===undefined){
+            newStates[ncc].answers[nq]=v;
+          }
+          if(Array.isArray(s.flags)&&s.flags[qi]){newStates[ncc].flags[nq]=true;}
         });
       });
-      // 3. Clear old keys (namespace overlap with new keys 0..oldMax-1)
+      // 4. Clear old-shape keys (they'd otherwise be re-detected next run) and write merged new-shape
       Object.keys(oldStates).forEach(function(gi){
         try{localStorage.removeItem('ea3quiz_v2_'+pfx+'extra_'+gi);}catch(e){}
       });
-      // 4. Write migrated new-shape states
       Object.keys(newStates).forEach(function(nc){
-        try{localStorage.setItem('ea3quiz_v2_'+pfx+'extra_'+nc, JSON.stringify(newStates[nc]));}catch(e){}
+        try{
+          localStorage.setItem('ea3quiz_v2_'+pfx+'extra_'+nc, JSON.stringify(newStates[nc]));
+          // Bump meta timestamp so sync pushes the merged state back to cloud
+          try{
+            var mk=JSON.parse(localStorage.getItem('ea3quiz_meta'))||{};
+            mk['ea3quiz_v2_'+pfx+'extra_'+nc]=Date.now();
+            localStorage.setItem('ea3quiz_meta',JSON.stringify(mk));
+          }catch(_){}
+        }catch(e){}
       });
+      changed=true;
     });
-    localStorage.setItem('ea3quiz_v2_extra_migration_v1','done');
+    return changed;
   }catch(e){
     // Never let migration break the app
     try{console.error('Extra state migration failed:',e);}catch(_){}
+    return false;
   }
 }
 
