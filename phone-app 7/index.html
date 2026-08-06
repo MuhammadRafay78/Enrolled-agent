@@ -3090,13 +3090,18 @@ function render(){
     var input=document.getElementById('ai-tutor-input');
     var sendBtn=document.getElementById('ai-tutor-send');
     if(!panel||!input||!sendBtn)return;
-    // Open panel if closed
-    panel.style.display='flex';
-    if(btn)btn.style.display='none';
-    panel.classList.remove('minimized');
+    // Route through the floating tutor button's open handler so the quiz
+    // reflows left (body.ai-open), chat history restores, etc. If the panel
+    // is already open, just prefill and send.
+    var wasOpen = (panel.style.display === 'flex' && !panel.classList.contains('minimized'));
+    if(!wasOpen && btn && btn.style.display !== 'none'){ btn.click(); }
+    else if(panel.classList.contains('minimized')){
+      panel.classList.remove('minimized');
+      if(window.innerWidth >= 1024) document.body.classList.add('ai-open');
+    }
     // Prefill and send
     input.value='Explain this question in detail. Break down why the correct answer is right and why each wrong answer is wrong.';
-    setTimeout(function(){sendBtn.click();},50);
+    setTimeout(function(){sendBtn.click();},80);
   };
   var rqb=document.getElementById('resetQBtn');
   if(rqb)rqb.onclick=function(){
@@ -4277,7 +4282,10 @@ __boot();
     font-weight:500;font-size:14px;
   }
   #ai-tutor-header:hover{background:var(--bg);}
-  #ai-tutor-panel.minimized{height:auto !important;}
+  /* Minimized state: collapse to just the header at the bottom of the screen.
+     We must release the top:24px anchor, otherwise top+bottom keeps the panel
+     stretched full-height and the empty body shows through. */
+  #ai-tutor-panel.minimized{height:auto !important; top:auto !important; bottom:24px !important;}
   #ai-tutor-panel.minimized #ai-tutor-messages,
   #ai-tutor-panel.minimized #ai-tutor-input-wrap{display:none;}
   #ai-tutor-close{cursor:pointer;font-size:20px;line-height:1;color:var(--muted);transition:color .2s;}
@@ -4312,6 +4320,16 @@ __boot();
   .ai-typing span:nth-child(2){animation-delay:.2s;}
   .ai-typing span:nth-child(3){animation-delay:.4s;}
   @keyframes aiBounce{0%,60%,100%{transform:translateY(0);opacity:.4;}30%{transform:translateY(-6px);opacity:1;}}
+  #ai-tutor-quicks{
+    display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 0;background:var(--card);
+  }
+  #ai-tutor-quicks button{
+    background:var(--bg);color:var(--ink);border:1px solid var(--border);
+    border-radius:14px;padding:5px 10px;font-size:12.5px;cursor:pointer;
+    transition:background .15s, border-color .15s;
+  }
+  #ai-tutor-quicks button:hover{ background:var(--card); border-color:var(--muted); }
+  #ai-tutor-quicks button:disabled{ opacity:.5; cursor:not-allowed; }
   #ai-tutor-input-wrap{
     border-top:1px solid var(--border);padding:12px;background:var(--card);
     display:flex;gap:8px;align-items:flex-end;
@@ -4390,6 +4408,13 @@ __boot();
   <div id="ai-tutor-messages">
     <div class="ai-msg bot">Hi. Ask me about the current question or any EA exam topic.</div>
   </div>
+  <div id="ai-tutor-quicks">
+    <button type="button" data-qp="explain">Explain this question</button>
+    <button type="button" data-qp="concept">Explain the concept</button>
+    <button type="button" data-qp="wrong">Why is my answer wrong?</button>
+    <button type="button" data-qp="mnemonic">Give me a mnemonic</button>
+    <button type="button" data-qp="similar">Similar practice Q</button>
+  </div>
   <div id="ai-tutor-input-wrap">
     <textarea id="ai-tutor-input" rows="1" placeholder="Ask anything..."></textarea>
     <button id="ai-tutor-send" title="Send">→</button>
@@ -4412,7 +4437,12 @@ __boot();
     if(window.innerWidth >= 1024) document.body.classList.toggle('ai-open', open);
     else document.body.classList.remove('ai-open');
   }
-  btn.onclick = () => { panel.style.display = 'flex'; btn.style.display = 'none'; panel.classList.remove('minimized'); _setAiOpen(true); setTimeout(()=>input.focus(),100); };
+  btn.onclick = () => {
+    panel.style.display = 'flex'; btn.style.display = 'none'; panel.classList.remove('minimized'); _setAiOpen(true);
+    // Restore this question's saved conversation, if any
+    try { _lastQHash = ''; _syncChatToCurrentQuestion(); } catch(e) {}
+    setTimeout(()=>input.focus(),100);
+  };
   closeBtn.onclick = (e) => { e.stopPropagation(); panel.style.display = 'none'; btn.style.display = 'flex'; _setAiOpen(false); };
   // Click header (but not close button) to minimize/expand
   document.getElementById('ai-tutor-header').onclick = () => {
@@ -4431,6 +4461,133 @@ __boot();
     input.style.height = 'auto';
     input.style.height = Math.min(input.scrollHeight, 100) + 'px';
   });
+
+  // ---- Per-question chat persistence ----
+  // Keyed by a stable hash of the question text so the same conversation reappears
+  // even after question re-grouping. Stored under one big object to keep
+  // localStorage key count reasonable.
+  const CHATS_KEY = 'ea3quiz_v2_ai_chats';
+  const CHATS_MAX_QUESTIONS = 200; // LRU cap so localStorage never balloons
+  function _currentQuestion(){
+    try{
+      if (typeof QUESTIONS !== 'undefined' && Array.isArray(QUESTIONS) &&
+          typeof st === 'object' && st && Array.isArray(st.order) &&
+          typeof pos === 'number' && pos >= 0 && pos < st.order.length) {
+        return QUESTIONS[st.order[pos]];
+      }
+    }catch(e){}
+    return null;
+  }
+  function _questionHash(q){
+    if (!q || !q.q) return '';
+    const s = String(q.q);
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(36);
+  }
+  function _loadAllChats(){
+    try{ return JSON.parse(localStorage.getItem(CHATS_KEY)) || {}; }catch(e){ return {}; }
+  }
+  function _saveAllChats(all){
+    try{
+      // Enforce LRU cap by keeping the newest CHATS_MAX_QUESTIONS entries
+      const keys = Object.keys(all);
+      if (keys.length > CHATS_MAX_QUESTIONS) {
+        const sorted = keys.map(k => ({k, t: (all[k].t || 0)})).sort((a,b) => b.t - a.t);
+        const keep = new Set(sorted.slice(0, CHATS_MAX_QUESTIONS).map(x => x.k));
+        Object.keys(all).forEach(k => { if (!keep.has(k)) delete all[k]; });
+      }
+      localStorage.setItem(CHATS_KEY, JSON.stringify(all));
+    }catch(e){}
+  }
+  function saveChatForCurrentQ(){
+    const q = _currentQuestion();
+    if (!q) return;
+    const key = _questionHash(q);
+    if (!key) return;
+    const bubbles = Array.from(messages.querySelectorAll('.ai-msg')).filter(m => {
+      const txt = (m.innerText || '').trim();
+      // Skip the greeting bubble
+      return txt && !/^Hi\. Ask me about/i.test(txt);
+    }).map(m => ({
+      r: m.classList.contains('user') ? 'u' : 'b',
+      // Store raw text for user, HTML for bot (so bot markdown formatting is preserved)
+      t: m.classList.contains('user') ? (m.innerText || '') : (m.innerHTML || '')
+    }));
+    const all = _loadAllChats();
+    if (bubbles.length === 0) { delete all[key]; }
+    else all[key] = { m: bubbles, t: Date.now() };
+    _saveAllChats(all);
+  }
+  function loadChatForCurrentQ(){
+    // Clear any existing bubbles except the greeting
+    Array.from(messages.querySelectorAll('.ai-msg')).forEach((m,i) => {
+      if (i > 0) m.remove(); // keep the first greeting
+    });
+    const q = _currentQuestion();
+    if (!q) return;
+    const key = _questionHash(q);
+    const all = _loadAllChats();
+    const rec = all[key];
+    if (!rec || !Array.isArray(rec.m)) return;
+    rec.m.forEach(b => {
+      const div = document.createElement('div');
+      div.className = 'ai-msg ' + (b.r === 'u' ? 'user' : 'bot');
+      if (b.r === 'u') div.textContent = b.t;
+      else div.innerHTML = b.t;
+      messages.appendChild(div);
+    });
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  // ---- Chapter notes context builder (grounds tutor in the study guide) ----
+  function _chapterNotesContext(q){
+    try{
+      if (typeof CHNOTES === 'undefined' || !CHNOTES || typeof PART === 'undefined') return '';
+      const notes = CHNOTES[PART];
+      if (!notes) return '';
+      // Extract chapter number from q.unit ("SU 12: ..." or "Chapter 12" or "12")
+      const unit = String((q && q.unit) || '');
+      const m = unit.match(/(\d+)/);
+      if (!m) return '';
+      const ch = notes[m[1]];
+      if (!ch) return '';
+      let out = 'STUDY-GUIDE CHAPTER NOTES (chapter ' + m[1] + ': ' + (ch.t || '') + '):\n';
+      // Forms cited in this chapter
+      if (Array.isArray(ch.f) && ch.f.length) {
+        out += 'Key forms: ' + ch.f.slice(0, 8).map(x => x.f + (x.ttl ? ' (' + x.ttl + ')' : '')).join('; ') + '\n';
+      }
+      // Key facts (short bullets from the book)
+      if (Array.isArray(ch.k) && ch.k.length) {
+        const facts = ch.k.slice(0, 6).map(x => (x.t || '').trim()).filter(Boolean);
+        if (facts.length) out += 'Key facts: ' + facts.join(' | ') + '\n';
+      }
+      // Section titles so the tutor knows what topics the chapter covers
+      if (Array.isArray(ch.s) && ch.s.length) {
+        const secs = ch.s.map(x => (x.t || '').trim()).filter(Boolean).slice(0, 12);
+        if (secs.length) out += 'Sections: ' + secs.join(' · ') + '\n';
+      }
+      // Hard cap so we don't blow up token cost
+      if (out.length > 2000) out = out.slice(0, 2000) + '…\n';
+      return out + '\n';
+    }catch(e){ return ''; }
+  }
+
+  // ---- Detect question change while panel is open, swap chat history ----
+  let _lastQHash = '';
+  function _syncChatToCurrentQuestion(){
+    const q = _currentQuestion();
+    const h = q ? _questionHash(q) : '';
+    if (h === _lastQHash) return;
+    _lastQHash = h;
+    loadChatForCurrentQ();
+  }
+  // Poll while panel is open; cheap and reliable across all view types
+  setInterval(() => {
+    if (panel.style.display === 'flex' && !panel.classList.contains('minimized')) {
+      _syncChatToCurrentQuestion();
+    }
+  }, 600);
 
   // Self-heal: if the current user is an admin, clear any stale rate-limit counter
   try {
@@ -4558,6 +4715,8 @@ __boot();
     }
 
     addMsg(q, true);
+    // Persist immediately so the user's question survives a mid-response close/refresh
+    try { saveChatForCurrentQ(); } catch(e) {}
     input.value = '';
     input.style.height = 'auto';
     sendBtn.disabled = true;
@@ -4577,35 +4736,110 @@ __boot();
     const userMsg = messages.lastElementChild.previousElementSibling; // the just-added user msg
     if (userMsg) userMsg.scrollIntoView({ block: 'start', behavior: 'smooth' });
 
-    // Grab the currently visible question and answer options from the page
+    // Grab the currently visible question, options, AND the correct answer + book's own explanation
+    // from the underlying JS data (not just the DOM), so the tutor teaches FROM the truth
+    // instead of guessing at it.
     let context = '';
-    const qtextEl = document.querySelector('.qtext');
-    if (qtextEl && qtextEl.offsetParent !== null) {
-      context = 'CURRENT QUESTION ON SCREEN:\n' + qtextEl.innerText.trim() + '\n\nANSWER OPTIONS:\n';
-      const opts = document.querySelectorAll('.opt');
-      opts.forEach((o, i) => {
-        if (o.offsetParent !== null) {
-          context += String.fromCharCode(65 + i) + '. ' + o.innerText.trim() + '\n';
+    try {
+      let currentQ = null;
+      // Global QUESTIONS / st / pos are set whenever a quiz view is active
+      if (typeof QUESTIONS !== 'undefined' && Array.isArray(QUESTIONS) &&
+          typeof st === 'object' && st && Array.isArray(st.order) &&
+          typeof pos === 'number' && pos >= 0 && pos < st.order.length) {
+        currentQ = QUESTIONS[st.order[pos]];
+      }
+      if (currentQ) {
+        context = 'CURRENT QUESTION ON SCREEN:\n' + (currentQ.q || '').trim() + '\n\nANSWER OPTIONS:\n';
+        (currentQ.opts || []).forEach((o, i) => {
+          context += String.fromCharCode(65 + i) + '. ' + String(o).trim() + '\n';
+        });
+        if (typeof currentQ.a === 'number' && currentQ.opts && currentQ.opts[currentQ.a]) {
+          context += '\nCORRECT ANSWER: ' + String.fromCharCode(65 + currentQ.a) +
+                     '. ' + String(currentQ.opts[currentQ.a]).trim() + '\n';
         }
+        // Student's own chosen answer — lets the tutor explain why THEIR pick was wrong
+        try {
+          const qIdx = st.order[pos];
+          const chosen = st.answers[qIdx];
+          if (chosen !== null && chosen !== undefined && currentQ.opts && currentQ.opts[chosen]) {
+            const letter = String.fromCharCode(65 + chosen);
+            const correct = (chosen === currentQ.a);
+            context += '\nSTUDENT\'S CHOSEN ANSWER: ' + letter + '. ' +
+                       String(currentQ.opts[chosen]).trim() +
+                       (correct ? '  (CORRECT)' : '  (INCORRECT — explain why the student was drawn to this trap and why the correct answer is better)') + '\n';
+          } else {
+            context += '\nSTUDENT\'S CHOSEN ANSWER: (not yet answered)\n';
+          }
+        } catch(e) {}
+        if (currentQ.expl && String(currentQ.expl).trim()) {
+          context += '\nBOOK\'S OWN EXPLANATION (use this as the ground truth; expand and clarify, do not contradict):\n' +
+                     String(currentQ.expl).trim() + '\n';
+        }
+        if (currentQ.topic) context += '\nTOPIC / CHAPTER: ' + String(currentQ.topic) + '\n';
+        context += '\n';
+        // Chapter notes — pull the study guide's own notes for the chapter this question belongs to
+        context += _chapterNotesContext(currentQ);
+      } else {
+        // Fallback: fall back to DOM scraping (no quiz view detected)
+        const qtextEl = document.querySelector('.qtext');
+        if (qtextEl && qtextEl.offsetParent !== null) {
+          context = 'CURRENT QUESTION ON SCREEN:\n' + qtextEl.innerText.trim() + '\n\nANSWER OPTIONS:\n';
+          document.querySelectorAll('.opt').forEach((o, i) => {
+            if (o.offsetParent !== null) context += String.fromCharCode(65 + i) + '. ' + o.innerText.trim() + '\n';
+          });
+          context += '\n';
+        }
+      }
+    } catch(e) {}
+
+    // Multi-turn memory: gather the last few messages from the panel so follow-ups
+    // like "why is B wrong?" carry context from the previous turn.
+    let historyBlock = '';
+    try {
+      const HIST_MAX = 8; // last 8 messages = ~4 exchanges. Keeps payload small.
+      const msgs = Array.from(messages.querySelectorAll('.ai-msg')).slice(-HIST_MAX);
+      // Skip the greeting "Hi. Ask me about the current question..." and the message we JUST added
+      // (the just-added user message is the LAST child; drop it).
+      const trimmed = msgs.slice(0, -1).filter(m => {
+        const txt = (m.innerText || '').trim();
+        return txt && !/^Hi\. Ask me about/i.test(txt);
       });
-      context += '\n';
-    }
+      if (trimmed.length) {
+        historyBlock = 'PRIOR CONVERSATION (most recent last):\n';
+        trimmed.forEach(m => {
+          const role = m.classList.contains('user') ? 'STUDENT' : 'TUTOR';
+          const txt = (m.innerText || '').trim().replace(/\s+/g, ' ');
+          // Cap each turn so a long tutor answer doesn't dominate the payload
+          historyBlock += role + ': ' + (txt.length > 700 ? txt.slice(0, 700) + '…' : txt) + '\n';
+        });
+        historyBlock += '\n';
+      }
+    } catch(e) {}
 
     const fullPrompt =
-      'You are a friendly, expert tutor for the IRS Enrolled Agent (EA) exam.\n\n' +
-      'IMPORTANT — TAX YEAR CONTEXT:\n' +
-      'The current EA Special Enrollment Examination (SEE) testing cycle runs May 1, 2026 through February 28, 2027, ' +
-      'and tests TAX YEAR 2025 law (returns filed in 2026). ALL your answers must reference tax year 2025 figures, ' +
-      'brackets, standard deduction, contribution limits, phase-outs, mileage rates, and thresholds. ' +
-      'Do NOT use 2024 numbers. Do NOT use 2023 numbers. If you are unsure whether a specific number reflects ' +
-      'the 2025 tax year, say so plainly rather than guessing. Also account for changes enacted by the One Big ' +
-      'Beautiful Bill Act (OBBBA) where relevant.\n\n' +
-      'FORMAT: Use clear markdown — **bold** for key terms, ### for section headings, bullet points for lists. ' +
-      'Keep explanations concise but complete.\n\n' +
+      'ROLE: You are an expert EA-exam tutor. Teach clearly, cite authority (IRC section, Circular 230 § number, ' +
+      'IRS Publication, form number) whenever a rule has one, and always tie your answer back to what will actually ' +
+      'be tested. Prefer short, well-structured explanations over long ones.\n\n' +
+      'TAX YEAR: The current EA SEE testing cycle runs May 1, 2026 – Feb 28, 2027 and tests TAX YEAR 2025 law ' +
+      '(returns filed in 2026). Every figure, bracket, standard deduction amount, contribution limit, phase-out, ' +
+      'mileage rate, and threshold you cite MUST be the tax year 2025 figure. Do not use 2024 or earlier numbers. ' +
+      'If you are unsure a specific number is the 2025 figure, say so plainly rather than guessing. Account for the ' +
+      'One Big Beautiful Bill Act (OBBBA) where it applies.\n\n' +
+      'GROUND TRUTH: If a CORRECT ANSWER and a BOOK EXPLANATION are provided below, treat them as authoritative. ' +
+      'Your job is to explain WHY the correct answer is correct and WHY each wrong option is wrong — not to ' +
+      're-derive the answer or contradict the book. If the book explanation is brief or unclear, expand on it.\n\n' +
+      'STYLE: Use clean markdown — **bold** for key terms, ### for short section headings, - for bullet lists. ' +
+      'When you contrast wrong answers, use a compact list ("Why A is wrong: …", "Why C is wrong: …"). ' +
+      'End with a one-line "**Key takeaway:**" that captures the rule the student should memorize.\n\n' +
+      'DO NOT emit LaTeX ($\\rightarrow$, $\\leq$, $\\alpha$, etc.). Write real characters: →, ≤, α. ' +
+      'DO NOT restate the question back to the student verbatim — go straight into the explanation.\n\n' +
+      historyBlock +
       context +
-      'STUDENT QUESTION: ' + q;
+      'STUDENT QUESTION (this turn): ' + q;
 
-    // Try the request, with one automatic retry on empty response
+    // Try the request, with one automatic retry on empty response.
+    // Streaming render is debounced via requestAnimationFrame — one paint per frame
+    // instead of one per network chunk. Big speed win on long answers.
     async function attemptRequest() {
       const res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
         method: 'POST',
@@ -4617,14 +4851,17 @@ __boot();
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let text = '';
+      let rafScheduled = false;
+      const flush = () => { rafScheduled = false; typing.innerHTML = renderMarkdown(text); };
       typing.innerHTML = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         text += decoder.decode(value, { stream: true });
-        typing.innerHTML = renderMarkdown(text);
-        // NO auto-scroll while streaming — user reads at their own pace
+        if (!rafScheduled) { rafScheduled = true; requestAnimationFrame(flush); }
       }
+      // Final render to ensure the last chunk lands
+      typing.innerHTML = renderMarkdown(text);
       return text;
     }
 
@@ -4642,12 +4879,30 @@ __boot();
       typing.textContent = 'Error: could not reach the AI. Please try again.';
     }
     sendBtn.disabled = false;
+    // Save the completed exchange so the conversation reappears next time
+    try { saveChatForCurrentQ(); } catch(e) {}
     input.focus();
   }
 
   sendBtn.onclick = send;
   input.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+  // Quick-action prompts — one click fills the input and sends
+  const QUICK_PROMPTS = {
+    explain: 'Explain this question in detail. Break down why the correct answer is right and why each wrong answer is wrong.',
+    concept: 'Explain the core tax concept behind this question in plain language. What is the underlying rule I need to understand?',
+    wrong:   'Look at the answer I chose. Explain why my pick is wrong (or if I got it right, why the trap answers are wrong), and how to spot this on the exam.',
+    mnemonic:'Give me a memory device (mnemonic, mental shortcut, or one-line rule) to remember the answer to this question for the EA exam.',
+    similar: 'Write ONE similar-difficulty EA-exam practice question that tests the same rule, with four options and the correct answer marked at the end. Do not repeat this exact question.'
+  };
+  document.querySelectorAll('#ai-tutor-quicks [data-qp]').forEach(b => {
+    b.onclick = () => {
+      const p = QUICK_PROMPTS[b.dataset.qp];
+      if (!p) return;
+      input.value = p;
+      send();
+    };
   });
 
   // Escape key minimizes the panel (only when it's open)
