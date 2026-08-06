@@ -77,6 +77,9 @@
   #darkToggle{border:1px solid var(--border);background:var(--card);border-radius:50%;width:30px;height:30px;cursor:pointer;font-size:13px;line-height:1;}
   .opt.sel{border-color:var(--blue);background:#eff6ff;}
   .flagbtn{margin-left:auto;border:1px solid var(--border);background:var(--card);border-radius:12px;padding:3px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--muted);}
+  /* Ask AI "hot" state: shown when the user picked the wrong answer, gently glowing to draw attention */
+  .flagbtn.askai-hot{color:#b45309;border-color:#f59e0b;background:rgba(245,158,11,.10);animation:askaiPulse 2s ease-in-out infinite;}
+  @keyframes askaiPulse{0%,100%{box-shadow:0 0 0 0 rgba(245,158,11,0);}50%{box-shadow:0 0 0 4px rgba(245,158,11,.18);}}
   .flagbtn.on{background:#fef3c7;border-color:#f59e0b;color:#b45309;}
   .qn.done-neutral{background:#dbeafe;border-color:var(--blue);color:var(--blue);font-weight:700;}
   .qn.flg{box-shadow:inset 0 -3px 0 #f59e0b;}
@@ -92,7 +95,7 @@
   .chip.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600;}
   .vlabel{font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px;line-height:1.3;}
   .vchip{display:inline-block;background:#eff6ff;color:var(--blue);border:1px solid #bfdbfe;border-radius:6px;padding:2px 7px;font-size:12.5px;font-weight:700;white-space:nowrap;margin:1px 0;}
-  body.dark .vchip{background:#1e3a5f;border-color:#2b4f7e;color:#93c5fd;}
+  body.is-dark .vchip{background:#1e3a5f;border-color:#2b4f7e;color:#93c5fd;}
   .vchip.dim{background:transparent;border-color:var(--border);color:var(--muted);font-weight:400;}
   .ntable.sheet td{font-size:13.5px;}
   .nhead a{color:var(--blue);font-weight:600;text-decoration:none;}
@@ -130,26 +133,26 @@
   .nsub{font-size:14px;margin:14px 0 6px;color:var(--ink);padding-left:10px;border-left:3px solid var(--blue);}
   .nsec p{margin:0 0 8px;line-height:1.6;font-size:14.5px;}
   .nnote{background:#fff7ed;border-left:4px solid #f59e0b;padding:8px 12px;border-radius:0 8px 8px 0;font-size:14px;}
-  body.dark .nnote{background:#3a2c10;}
+  body.is-dark .nnote{background:#3a2c10;}
   .nlist{margin:4px 0 10px 20px;font-size:14.5px;}
   .nlist li{margin-bottom:5px;line-height:1.55;}
   .ntable{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13.5px;}
   .ntable th,.ntable td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top;}
   .ntable th{background:#f1f5f9;font-weight:700;}
-  body.dark .ntable th{background:#243044;}
+  body.is-dark .ntable th{background:#243044;}
   .fbook{margin-top:6px;padding:6px 9px;background:#f8fafc;border-left:3px solid var(--border);font-size:12.5px;color:#475569;line-height:1.5;}
-  body.dark .fbook{background:#1c2739;color:#b8c4d4;}
+  body.is-dark .fbook{background:#1c2739;color:#b8c4d4;}
   .fbook b{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;}
   .nsrc{color:var(--muted);font-size:11.5px;margin-top:3px;font-style:italic;}
   .nex{margin:6px 0 12px;border:1px dashed var(--border);border-radius:8px;padding:8px 12px;background:#f8fafc;}
-  body.dark .nex{background:#1c2739;}
+  body.is-dark .nex{background:#1c2739;}
   .bq{border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;}
   .bqq{font-size:14.5px;font-weight:600;margin-bottom:9px;line-height:1.55;}
   .bqn{color:var(--blue);margin-right:4px;}
   .bqopts{display:flex;flex-direction:column;gap:6px;}
   .bqopt{text-align:left;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;background:var(--card);cursor:pointer;font-size:13.5px;color:var(--ink);font-family:inherit;line-height:1.45;}
   .bqopt:hover:not(:disabled){border-color:var(--blue);background:#f8faff;}
-  body.dark .bqopt:hover:not(:disabled){background:#20304a;}
+  body.is-dark .bqopt:hover:not(:disabled){background:#20304a;}
   .bqopt b{color:var(--blue);margin-right:5px;}
   .bqopt:disabled{cursor:default;}
   .bqopt.correct{border-color:var(--green);background:var(--green-bg);}
@@ -168,7 +171,7 @@
   .refsrc a{color:var(--blue);font-style:normal;font-weight:600;text-decoration:none;}
   .refbox{border:1px solid var(--border);border-radius:10px;margin:0 0 14px;overflow:hidden;background:var(--card);}
   .refhead{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:10px 13px;border:none;background:#f8fafc;font-size:13.5px;font-weight:700;cursor:pointer;color:var(--ink);}
-  body.dark .refhead{background:#20304a;}
+  body.is-dark .refhead{background:#20304a;}
   .refhead .reflbl{font-weight:400;color:var(--muted);font-size:12.5px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
   .refhead .chev{margin-left:auto;color:var(--muted);}
   .refbody{padding:4px 14px 10px;font-size:14px;}
@@ -180,7 +183,7 @@
   .refbody .rsec{padding-bottom:8px;border-bottom:1px solid var(--border);}
   /* --- Key Numbers: expandable detail column --- */
   .tbrow>td{background:#f8fafc;}
-  body.dark .tbrow>td{background:#141d2e;}
+  body.is-dark .tbrow>td{background:#141d2e;}
   .tbwrap{padding:10px 12px 12px;}
   .tblbl{font-size:12.5px;font-weight:700;color:var(--blue);margin-bottom:7px;}
   .tbwrap .ntable{margin:0 0 9px;}
@@ -196,10 +199,10 @@
   .shhint{font-size:12px;color:var(--muted);}
   .dtbtn{border:1px solid var(--border);border-radius:16px;background:var(--card);color:var(--blue);font-size:11.5px;font-weight:700;padding:4px 10px;cursor:pointer;white-space:nowrap;font-family:inherit;}
   .dtbtn:hover{border-color:var(--blue);background:#f0f6ff;}
-  body.dark .dtbtn:hover{background:#1e3a5f;}
+  body.is-dark .dtbtn:hover{background:#1e3a5f;}
   .dtbtn.on{background:var(--blue);color:#fff;border-color:var(--blue);}
   .dtrow>td{background:#f8fafc;border-top:none;padding:0 !important;}
-  body.dark .dtrow>td{background:#141d2e;}
+  body.is-dark .dtrow>td{background:#141d2e;}
   .dtwrap{padding:12px 14px 14px;}
   .dtwrap .dtsec{font-size:13px;font-weight:700;color:var(--blue);margin-bottom:2px;}
   .dtwrap .dtfrom{font-size:11.5px;color:var(--muted);font-style:italic;margin-bottom:9px;}
@@ -207,7 +210,7 @@
   .dtwrap ul{margin:4px 0 10px 20px;font-size:14px;}
   .dtwrap li{margin-bottom:5px;line-height:1.55;}
   .dtwrap mark{background:#fef08a;color:inherit;padding:1px 2px;border-radius:3px;}
-  body.dark .dtwrap mark{background:#5c4a10;color:#fde68a;}
+  body.is-dark .dtwrap mark{background:#5c4a10;color:#fde68a;}
   .dtwrap .ntable{margin:6px 0 12px;}
   .dtjump{border:1px solid var(--blue);border-radius:8px;background:var(--card);color:var(--blue);font-size:12.5px;font-weight:600;padding:6px 12px;cursor:pointer;font-family:inherit;margin-top:4px;}
   .dtjump:hover{background:var(--blue);color:#fff;}
@@ -245,7 +248,7 @@
   .swfoot a{color:var(--muted);text-decoration:none;}
   .swfoot a:hover{color:var(--red);}
   .swnote{font-size:11.5px;color:var(--muted);background:#fff7ed;border-radius:7px;padding:6px 8px;margin-top:9px;}
-  body.dark .swnote{background:#3a2c10;}
+  body.is-dark .swnote{background:#3a2c10;}
   /* ---------- home screen: progress header + grouped tiles ---------- */
   .mhead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px;flex-wrap:wrap;}
   .mtitle{font-size:26px;font-weight:800;line-height:1.15;}
@@ -264,15 +267,15 @@
   .mi{width:19px;height:19px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;vertical-align:-4px;}
   /* "See answers" — revealed, not attempted */
   .revealnote{font-size:13.5px;background:#eff6ff;border-left:4px solid var(--blue);color:#1e3a8a;padding:9px 13px;border-radius:0 8px 8px 0;margin:16px 0 4px;line-height:1.5;}
-  body.dark .revealnote{background:#1a2a45;color:#bfdbfe;}
+  body.is-dark .revealnote{background:#1a2a45;color:#bfdbfe;}
   .revealnote a{color:var(--blue);font-weight:600;}
-  body.dark .revealnote a{color:#93c5fd;}
+  body.is-dark .revealnote a{color:#93c5fd;}
   .qn.seen{background:#eff6ff;border-color:var(--blue);color:var(--blue);}
-  body.dark .qn.seen{background:#1a2a45;}
+  body.is-dark .qn.seen{background:#1a2a45;}
   .side-btn.on{background:#eff6ff;border-color:var(--blue);color:var(--blue);font-weight:600;}
-  body.dark .side-btn.on{background:#1a2a45;color:#93c5fd;}
+  body.is-dark .side-btn.on{background:#1a2a45;color:#93c5fd;}
   .xnote{font-size:12.5px;color:var(--muted);background:#f1f5f9;border-radius:8px;padding:8px 11px;margin:0 0 14px;}
-  body.dark .xnote{background:#1c2739;}
+  body.is-dark .xnote{background:#1c2739;}
   .acctbtn{border:1px solid var(--border);background:var(--card);color:var(--ink);font-size:12.5px;font-weight:600;font-family:inherit;padding:5px 11px;border-radius:16px;cursor:pointer;display:flex;align-items:center;gap:6px;}
   .acctbtn:hover{border-color:var(--blue);color:var(--blue);}
   .acctbtn.on{border-color:var(--green);color:var(--green);}
@@ -349,7 +352,7 @@
   .mtile .nm{display:block;font-size:12.5px;font-weight:700;margin-top:7px;}
   .mtile .sub{display:block;font-size:11px;color:var(--muted);margin-top:2px;}
   .mtile .sub.warn{color:#b45309;font-weight:600;}
-  body.dark .mtile .sub.warn{color:#fbbf24;}
+  body.is-dark .mtile .sub.warn{color:#fbbf24;}
   .mwide{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px 15px;cursor:pointer;text-align:left;font-family:inherit;color:var(--ink);width:100%;display:flex;gap:12px;align-items:center;}
   .mwide:hover{border-color:var(--blue);}
   .mwide:hover .mi{color:var(--blue);}
@@ -461,12 +464,22 @@
   body.dark    {--bg:#14181f;--card:#1a1f28;--ink:#dde2ec;--muted:#8f99aa;--blue:#7ab0ea;--green:#69cc8b;--green-bg:#182420;--red:#dc7373;--red-bg:#241a1c;--border:#252b37;}
   body.slate   {--bg:#0f1319;--card:#151a22;--ink:#d6dbe4;--muted:#828b9b;--blue:#75a8e0;--green:#66c988;--green-bg:#12201c;--red:#d76d6d;--red-bg:#221819;--border:#1e2431;}
   body.midnight{--bg:#0a0d13;--card:#10141c;--ink:#d0d6e0;--muted:#7c8494;--blue:#70a3dc;--green:#62c485;--green-bg:#101c19;--red:#d26868;--red-bg:#1e1517;--border:#181d28;}
-  body.onyx    {--bg:#050609;--card:#0b0d12;--ink:#c8ced8;--muted:#727988;--blue:#68a0da;--green:#60c283;--green-bg:#0c1815;--red:#cf6666;--red-bg:#191214;--border:#131722;}
+  /* --- New visually-distinct dark palettes --- */
+  /* Dracula — purple base, cyan blue, pink accents */
+  body.dracula {--bg:#282a36;--card:#2f3142;--ink:#f8f8f2;--muted:#8b93b7;--blue:#8be9fd;--green:#50fa7b;--green-bg:#213826;--red:#ff5555;--red-bg:#3a1e1e;--border:#44475a;}
+  /* Solarized Dark — teal background, amber/blue accents */
+  body.solarized{--bg:#002b36;--card:#073642;--ink:#eee8d5;--muted:#93a1a1;--blue:#268bd2;--green:#859900;--green-bg:#0d3c3a;--red:#dc322f;--red-bg:#3a1b1a;--border:#0e4451;}
+  /* Tokyo Night — deep navy, soft pink & blue */
+  body.tokyo   {--bg:#1a1b26;--card:#232433;--ink:#c0caf5;--muted:#7d8ac0;--blue:#7aa2f7;--green:#9ece6a;--green-bg:#1f2c1c;--red:#f7768e;--red-bg:#2e1c22;--border:#2a2e42;}
+  /* Forest — dark olive/green with warm accents */
+  body.forest  {--bg:#1a2418;--card:#212d1f;--ink:#d6e0d3;--muted:#8b9c85;--blue:#8ab77f;--green:#a3c993;--green-bg:#1e2c1e;--red:#c67b6a;--red-bg:#2b1e1c;--border:#2f3a2b;}
+  /* Amber — warm retro terminal (dark brown/amber) */
+  body.amber   {--bg:#1a1408;--card:#241a10;--ink:#f0c988;--muted:#b09068;--blue:#d4a04f;--green:#b8c982;--green-bg:#2a2712;--red:#d97060;--red-bg:#2e1a15;--border:#3a2c1c;}
 
-  body.dim .opt:hover:not(:disabled),body.dark .opt:hover:not(:disabled),body.slate .opt:hover:not(:disabled),body.midnight .opt:hover:not(:disabled),body.onyx .opt:hover:not(:disabled){background:color-mix(in srgb, var(--card) 65%, var(--bg));}
-  body.dim .badge, body.dark .badge, body.slate .badge, body.midnight .badge, body.onyx .badge{background:color-mix(in srgb, var(--blue) 22%, var(--card));color:var(--ink);}
-  body.dim .badge.unit,body.dark .badge.unit,body.slate .badge.unit,body.midnight .badge.unit,body.onyx .badge.unit{background:var(--card);color:var(--muted);}
-  body.dim .exp .wrongitem,body.dark .exp .wrongitem,body.slate .exp .wrongitem,body.midnight .exp .wrongitem,body.onyx .exp .wrongitem{background:var(--card);color:var(--ink);border-color:var(--border);}
+  body.dim .opt:hover:not(:disabled),body.is-dark .opt:hover:not(:disabled),body.slate .opt:hover:not(:disabled),body.midnight .opt:hover:not(:disabled),body.onyx .opt:hover:not(:disabled){background:color-mix(in srgb, var(--card) 65%, var(--bg));}
+  body.dim .badge, body.is-dark .badge, body.slate .badge, body.midnight .badge, body.onyx .badge{background:color-mix(in srgb, var(--blue) 22%, var(--card));color:var(--ink);}
+  body.dim .badge.unit,body.is-dark .badge.unit,body.slate .badge.unit,body.midnight .badge.unit,body.onyx .badge.unit{background:var(--card);color:var(--muted);}
+  body.dim .exp .wrongitem,body.is-dark .exp .wrongitem,body.slate .exp .wrongitem,body.midnight .exp .wrongitem,body.onyx .exp .wrongitem{background:var(--card);color:var(--ink);border-color:var(--border);}
   .why p{margin:0 0 10px;line-height:1.55;}
   .why p:last-of-type{margin-bottom:12px;}
   .why .wow-hd{margin-top:10px;margin-bottom:6px;font-size:13.5px;color:var(--muted);}
@@ -1345,6 +1358,17 @@ function currentStreak(){
   }
   return streak;
 }
+// Total questions answered across the current streak's days (inclusive of today)
+function streakTotal(){
+  var streak=currentStreak(); if(!streak)return 0;
+  var log=dailyLog(); var total=0; var d=new Date();
+  for(var i=0;i<streak;i++){
+    var k=estDate(d);
+    total+=(log[k]||0);
+    d.setDate(d.getDate()-1);
+  }
+  return total;
+}
 
 // ============================================================================
 // ==== ACCOUNTS & CLOUD SYNC (Supabase)
@@ -1926,19 +1950,25 @@ function acctScreen(){
 // ============================================================================
 // ---------- dark mode ----------
 var THEMES=[
-  {id:'light', label:'Light',    icon:'☀️', cls:'',        sw:'#f4f6f9'},
-  {id:'dim',   label:'Dim',      icon:'🌑', cls:'dim',     sw:'#1a1e26'},
-  {id:'dark',  label:'Dark',     icon:'🌒', cls:'dark',    sw:'#14181f'},
-  {id:'slate', label:'Slate',    icon:'🌓', cls:'slate',   sw:'#0f1319'},
-  {id:'midnight',label:'Midnight',icon:'🌌',cls:'midnight',sw:'#0a0d13'},
-  {id:'onyx',  label:'Onyx',     icon:'⚫', cls:'onyx',    sw:'#050609'}
+  {id:'light',   label:'Light',      icon:'☀️',  cls:'',         sw:'#f4f6f9'},
+  {id:'dim',     label:'Dim',        icon:'🌑',  cls:'dim',      sw:'#1a1e26'},
+  {id:'dark',    label:'Dark',       icon:'🌒',  cls:'dark',     sw:'#14181f'},
+  {id:'midnight',label:'Midnight',   icon:'🌌',  cls:'midnight', sw:'#0a0d13'},
+  {id:'dracula', label:'Dracula',    icon:'🧛',  cls:'dracula',  sw:'#282a36'},
+  {id:'solarized',label:'Solarized', icon:'🧭',  cls:'solarized',sw:'#002b36'},
+  {id:'tokyo',   label:'Tokyo Night',icon:'🗼',  cls:'tokyo',    sw:'#1a1b26'},
+  {id:'forest',  label:'Forest',     icon:'🌲',  cls:'forest',   sw:'#1a2418'},
+  {id:'amber',   label:'Amber',      icon:'🕯️',  cls:'amber',    sw:'#1a1408'}
 ];
-var THEME_CLASSES=['dim','dark','slate','midnight','onyx','sepia','ocean','forest','warm','nord','rose','hc'];
+var THEME_CLASSES=['dim','dark','slate','midnight','onyx','dracula','solarized','tokyo','forest','amber','sepia','ocean','warm','nord','rose','hc','is-dark'];
 function applyTheme(id){
   var t=THEMES.find(function(x){return x.id===id;})||THEMES[0];
   var b=document.body;
   THEME_CLASSES.forEach(function(c){ b.classList.remove(c); });
   if(t.cls) b.classList.add(t.cls);
+  // Mark the body as "is-dark" for any non-light theme so shared dark-mode
+  // sub-element styling applies across every dark variant.
+  if(t.cls) b.classList.add('is-dark');
   // Force a reflow so subsequent paint uses the new theme cleanly.
   void b.offsetHeight;
   var btn=document.getElementById('darkToggle');
@@ -1958,7 +1988,7 @@ function initDark(){
     try{ if(localStorage.getItem('ea3quiz_dark')==='1') saved='dark'; }catch(err){}
   }
   // Retired themes map to the closest current one
-  var retired={ocean:'slate',forest:'slate',warm:'dark',nord:'slate',rose:'midnight',sepia:'light',hc:'onyx'};
+  var retired={ocean:'tokyo',warm:'amber',nord:'tokyo',rose:'dracula',sepia:'light',hc:'dark',slate:'midnight',onyx:'midnight'};
   if(saved && retired[saved]) saved=retired[saved];
   applyTheme(saved||'light');
   // Purge the now-unused synced key so it doesn't clash with the local one.
@@ -2063,7 +2093,8 @@ var MICON={
   flag:'<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
   xmark:'<path d="M18 6L6 18M6 6l12 12"/>',
   shuffle:'<path d="M16 3h5v5M4 20l17-17M21 16v5h-5M15 15l6 6M4 4l5 5"/>',
-  card:'<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M7 3h10M5 10h14"/>'
+  card:'<rect x="3" y="6" width="18" height="14" rx="2"/><path d="M7 3h10M5 10h14"/>',
+  target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/>'
 };
 function micon(n){return '<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">'+(MICON[n]||'')+'</svg>';}
 function showMenu(){
@@ -2114,9 +2145,10 @@ function showMenu(){
       (swPartTotal(swGetAll(),PART)>0?'<span class="mpill" style="cursor:default">⏱ '+fmtDur(swPartTotal(swGetAll(),PART))+'</span>':'')+
       '<button class="mpill" id="partPill">Part 1 · 2 · 3</button></div></div>';
 
-  // ---- four stat cards ----
-  var _today=todayCount(), _streak=currentStreak();
+  // ---- stat cards ----
+  var _today=todayCount(), _streak=currentStreak(), _streakTot=streakTotal();
   var _streakStr = _streak>0 ? ('🔥 '+_streak+'-day streak') : 'Answer a question to start a streak';
+  var _streakSubline = _streak>0 ? ('over '+_streak+' day'+(_streak===1?'':'s')+' · avg '+Math.round(_streakTot/_streak)+'/day') : 'Not started yet';
   html+='<div class="mstats">'+
     '<div class="mstat"><div class="lbl">Answered</div><div class="val">'+ansAll.toLocaleString()+
       '<small> / '+totalQ.toLocaleString()+'</small></div><div class="mbar"><i style="width:'+(totalQ?Math.round(ansAll/totalQ*100):0)+'%"></i></div></div>'+
@@ -2126,6 +2158,8 @@ function showMenu(){
       '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+(weakest?'Weakest: '+esc(weakest.u.replace(/:.*$/,''))+' ('+Math.round(weakest.p*100)+'%)':'Answer a few to see gaps')+'</div></div>'+
     '<div class="mstat"><div class="lbl">Today</div><div class="val" style="color:'+(_today?'#2563eb':'var(--muted)')+'">'+_today+'</div>'+
       '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+_streakStr+'</div></div>'+
+    '<div class="mstat"><div class="lbl">Streak total</div><div class="val" style="color:'+(_streakTot?'#059669':'var(--muted)')+'">'+_streakTot.toLocaleString()+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+_streakSubline+'</div></div>'+
   '</div>';
 
   if(totalQ)html+='<input class="searchbox" id="searchBox" placeholder="🔍 Search all '+totalQ.toLocaleString()+' questions by keyword or topic…"><div id="sres"></div>';
@@ -2190,6 +2224,13 @@ function showMenu(){
     '<span class="sub'+(_mixCount?' warn':'')+'">'+(_mixCount?_mixCount+' wrong + flagged':'nothing to mix')+'</span></button>');
   tiles.push('<button class="mtile" id="fcBtn"'+(_wrongCount?'':' disabled style="opacity:.5;cursor:default"')+'><span class="ic">'+micon('card')+'</span><span class="nm">Flashcards</span>'+
     '<span class="sub'+(_wrongCount?' warn':'')+'">'+(_wrongCount?(fcMasteryPct()+'% mastered · '+_wrongCount+' cards'):'no cards yet')+'</span></button>');
+  // "Toughest for me" — curated quiz of the hardest questions for THIS student:
+  // wrong + flagged (deduped) + a top-up of unanswered questions in weak chapters.
+  var _toughPreview = (function(){
+    try { return collectToughestForMe(25).length; } catch(e){ return 0; }
+  })();
+  tiles.push('<button class="mtile" id="toughBtn"'+(_toughPreview?'':' disabled style="opacity:.5;cursor:default"')+'><span class="ic">'+micon('target')+'</span><span class="nm">Toughest for me</span>'+
+    '<span class="sub'+(_toughPreview?' warn':'')+'">'+(_toughPreview?_toughPreview+' curated Qs':'answer a few first')+'</span></button>');
   tiles.push('<button class="mtile" id="dashBtn"><span class="ic">'+micon('chart')+'</span><span class="nm">Performance</span><span class="sub">by unit</span></button>');
   html+='<div class="mgrouphd"><span>Reference</span></div><div class="mgrid4">'+tiles.join('')+'</div>';
 
@@ -2219,6 +2260,7 @@ function showMenu(){
   var _wbn=document.getElementById('wrongBtn'); if(_wbn&&_wrongCount)_wbn.onclick=startWrongReview;
   var _mbn=document.getElementById('mixBtn'); if(_mbn&&_mixCount)_mbn.onclick=startShuffledWrongFlagged;
   var _fcbn=document.getElementById('fcBtn'); if(_fcbn&&_wrongCount)_fcbn.onclick=startFlashcards;
+  var _tbn=document.getElementById('toughBtn'); if(_tbn&&_toughPreview)_tbn.onclick=startToughestForMe;
   document.getElementById('dashBtn').onclick=showDashboard;
   var mb=document.getElementById('mcqBtn'); if(mb)mb.onclick=mcqChapterList;
   var xb=document.getElementById('xtraBtn'); if(xb)xb.onclick=extraList;
@@ -2639,6 +2681,370 @@ function startShuffledWrongFlagged(){
   enterQuiz();
 }
 
+// ---- "Toughest for me": a curated quiz of the hardest questions FOR THIS STUDENT ----
+// Uses every signal we have:
+//   - Wrong (currently answered incorrectly): +8
+//   - Wrong + flagged double-signal: +4 extra
+//   - Flagged: +5
+//   - In a weak chapter (accuracy < 70%, ≥3 attempts): +3
+//   - In a weak topic (accuracy < 70%, ≥3 attempts): +2
+//   - Question text starts with a NOT/EXCEPT trap: +3
+//   - Question involves calculations ($, numbers, %): +2
+//   - Long question stem (>250 chars, more mental load): +1
+//   - Flashcard confidence rating 1 or 2 (student marked "low"): +6
+//   - Unanswered but in a weak chapter (fresh challenge): +4
+// Then the top N locally-ranked candidates are optionally reranked by the AI
+// (cached per Part for 6h so it doesn't fire on every click).
+function _textToughFeatures(text){
+  var t = String(text || '').toLowerCase();
+  var s = 0;
+  // Negation/exception traps — EA exam favourite
+  if (/\b(not|except|least\s+likely|does\s+not|cannot|is\s+not\s+true|is\s+not\s+correct)\b/i.test(text || '')) s += 3;
+  // Contains dollar amounts / percentages / calculations
+  if (/\$[\d,]+|\d+%|\bcalculate|\bcompute|\btotal\s+of|\bhow\s+much/i.test(text || '')) s += 2;
+  // Long stem
+  if (t.length > 250) s += 1;
+  return s;
+}
+// Analyze attempt history to detect misconception patterns:
+// for each topic, which wrong option index does the student pick most often?
+// If they always pick B when the answer is C on §1031 questions → they have a specific misconception.
+function _computeMisconceptions(){
+  var attempts = loadAttempts();
+  // Need to know each question's topic + correct answer + student's wrong choice — but attempts
+  // are keyed by question text hash, we don't know the topic from the hash alone.
+  // Do a scan across the loaded PARTS to build a hash→(topic, a) map from the question bank.
+  var idx = {};
+  try {
+    var parts = (typeof PARTS!=='undefined')?PARTS:null;
+    if(parts){
+      [1,2,3].forEach(function(p){
+        if(!parts[p])return;
+        (parts[p].exams||[]).forEach(function(ex){ (ex.questions||[]).forEach(function(q){ idx[_qh(q.q)]={topic:q.topic,unit:q.unit,a:q.a}; }); });
+        (parts[p].mcqs||[]).forEach(function(mc){ (mc.questions||[]).forEach(function(q){ idx[_qh(q.q)]={topic:q.topic,unit:q.unit,a:q.a}; }); });
+        (parts[p].extra||[]).forEach(function(g){ (g.questions||[]).forEach(function(q){ idx[_qh(q.q)]={topic:q.topic,unit:q.unit,a:q.a}; }); });
+      });
+    }
+  } catch(e){}
+  // Aggregate wrong-choice picks by topic
+  var byTopic = {}; // { topic: { wrongPicks: [c1,c2,c3,c4], total, hotPick } }
+  Object.keys(attempts).forEach(function(h){
+    var meta = idx[h]; if(!meta) return;
+    var tp = meta.topic||''; if(!tp) return;
+    attempts[h].forEach(function(att){
+      if(att.ok) return; // ignore correct attempts
+      if(!byTopic[tp]) byTopic[tp] = { wrong:[0,0,0,0], total:0 };
+      if(att.c>=0 && att.c<=3) byTopic[tp].wrong[att.c]++;
+      byTopic[tp].total++;
+    });
+  });
+  // Find topics with a dominant wrong-choice bias (>= 40% of wrong attempts fell to one option)
+  var out = {};
+  Object.keys(byTopic).forEach(function(tp){
+    var b = byTopic[tp];
+    if(b.total < 3) return;
+    var maxIdx = 0, maxN = b.wrong[0];
+    for(var i=1;i<4;i++) if(b.wrong[i]>maxN){maxN=b.wrong[i];maxIdx=i;}
+    if(maxN/b.total >= 0.4) out[tp] = { bias:maxIdx, count:b.total };
+  });
+  return out;
+}
+
+function collectToughestForMe(limit){
+  limit = limit || 25;
+  var flagged = collectFlagged();
+  var wrong   = collectWrong();
+  var fcRatings = {}; try { fcRatings = JSON.parse(localStorage.getItem('ea3quiz_v2_fcRatings')||'{}'); } catch(e){}
+  var attempts = loadAttempts();
+  var misconceptions = _computeMisconceptions();
+  var now = Date.now();
+  var DAY = 86400000;
+
+  // Compute per-chapter and per-topic accuracy
+  var chapAgg = {}, topicAgg = {};
+  function fold(qs, answers){
+    if(!answers) return;
+    answers.forEach(function(v,j){
+      if(v===null||v===undefined||!qs[j]) return;
+      var u=qs[j].unit||'—', tp=qs[j].topic||'—';
+      chapAgg[u]=chapAgg[u]||{a:0,r:0};   chapAgg[u].a++;   if(v===qs[j].a) chapAgg[u].r++;
+      topicAgg[tp]=topicAgg[tp]||{a:0,r:0}; topicAgg[tp].a++; if(v===qs[j].a) topicAgg[tp].r++;
+    });
+  }
+  EXAMS.forEach(function(ex,i){ var s=loadState(i); if(s) fold(ex.questions, s.answers); });
+  MCQS.forEach(function(mc,i){ var s=mcqState(i); if(s) fold(mc.questions, s.answers); });
+  (XTRA||[]).forEach(function(g,i){ var s=xState(i); if(s) fold(g.questions, s.answers); });
+  var weakChapters = {}, weakTopics = {};
+  Object.keys(chapAgg).forEach(function(u){ var g=chapAgg[u]; if(g.a>=3 && (g.r/g.a)<0.7) weakChapters[u]=true; });
+  Object.keys(topicAgg).forEach(function(t){ var g=topicAgg[t]; if(g.a>=3 && (g.r/g.a)<0.7) weakTopics[t]=true; });
+
+  // Score wrong/flagged candidates
+  var byText = {};
+  function tag(item, kind){
+    var text = String(item.q.q || '');
+    if(!byText[text]) byText[text] = { q:item.q, ref:item.ref, score:0, why:{} };
+    var s = byText[text];
+    if(kind === 'wrong')   { s.score += 8; s.why.wrong = true; }
+    if(kind === 'flagged') { s.score += 5; s.why.flagged = true; }
+  }
+  wrong.forEach(function(i){ tag(i,'wrong'); });
+  flagged.forEach(function(i){ tag(i,'flagged'); });
+
+  // Apply all the other signals to whatever we already have
+  Object.keys(byText).forEach(function(t){
+    var e = byText[t]; var q = e.q;
+    if(e.why.wrong && e.why.flagged) { e.score += 4; e.why.doubleSignal = true; }
+    if(weakChapters[q.unit||'']) { e.score += 3; e.why.weakChap = true; }
+    if(weakTopics[q.topic||'']) { e.score += 2; e.why.weakTopic = true; }
+    e.score += _textToughFeatures(q.q);
+    // Flashcard confidence: rating 1 or 2 = "still confused"
+    var rating = null;
+    if(fcRatings && e.ref && fcRatings[e.ref] && typeof fcRatings[e.ref].rating === 'number') rating = fcRatings[e.ref].rating;
+    if(rating !== null && rating <= 2) { e.score += 6; e.why.lowConf = true; }
+    // Attempt history signals (only present if the student has attempted this question)
+    var hist = attempts[_qh(q.q)];
+    if(hist && hist.length){
+      var wrongs = hist.filter(function(a){return !a.ok;}).length;
+      var last = hist[hist.length-1];
+      // Multiple wrong attempts across time = truly stuck
+      if(wrongs >= 2){ e.score += 10; e.why.repeatWrong = true; }
+      // Regression: got it right earlier, wrong now — confidence lost
+      if(hist.length >= 2 && hist[hist.length-2].ok && !last.ok){ e.score += 8; e.why.regression = true; }
+      // Recency: wrong within the last 3 days
+      if(!last.ok && (now - (last.ts||0)) < 3*DAY){ e.score += 3; e.why.recentWrong = true; }
+    }
+    // Misconception pattern: student has a dominant wrong pick on this topic
+    if(q.topic && misconceptions[q.topic]){
+      e.score += 2;
+      e.why.misconception = misconceptions[q.topic].bias; // stores the biased index
+    }
+  });
+
+  // Fresh candidates: unanswered questions in weak chapters (real gaps)
+  var freshCandidates = [];
+  function seed(qs, refPrefix, sourceIdx, stateReader){
+    var s = stateReader ? stateReader(sourceIdx) : null;
+    qs.forEach(function(q, i){
+      var u = q.unit || '';
+      if(!weakChapters[u] && !weakTopics[q.topic||'']) return;
+      if(s && s.answers && s.answers[i] !== null && s.answers[i] !== undefined) return;
+      var text = String(q.q || '');
+      if(byText[text]) return;
+      var sc = 4 + _textToughFeatures(q.q);
+      freshCandidates.push({
+        q:q, ref: refPrefix + '_' + sourceIdx + '_' + i,
+        score: sc, why:{fresh:true, weakChap:!!weakChapters[u], weakTopic:!!weakTopics[q.topic||'']}
+      });
+    });
+  }
+  EXAMS.forEach(function(ex,i){ seed(ex.questions, 'm', i, loadState); });
+  MCQS.forEach(function(mc,i){ seed(mc.questions, 'mcq', i, mcqState); });
+  (XTRA||[]).forEach(function(g,i){ seed(g.questions, 'xtra', i, xState); });
+  for(var f=freshCandidates.length-1; f>0; f--){
+    var fj=Math.floor(Math.random()*(f+1));
+    var ft=freshCandidates[f]; freshCandidates[f]=freshCandidates[fj]; freshCandidates[fj]=ft;
+  }
+  freshCandidates.sort(function(a,b){ return b.score - a.score; });
+
+  var scored = Object.keys(byText).map(function(t){ return byText[t]; });
+  scored.sort(function(a,b){ return b.score - a.score; });
+
+  // 70% wrong/flagged, 30% fresh weak-area — grow pool for AI reranking
+  var poolSize = Math.max(limit, Math.min(50, scored.length + freshCandidates.length));
+  var takeScored = Math.min(scored.length, Math.ceil(poolSize * 0.7));
+  var raw = scored.slice(0, takeScored);
+  var need = poolSize - raw.length;
+  if(need > 0) raw = raw.concat(freshCandidates.slice(0, need));
+
+  // ---- Diversify by chapter ----
+  // Cap per-chapter to at most Math.ceil(limit / 5) so a single dominant weak chapter
+  // doesn't swallow the whole quiz. Overflow goes into a "reserve" bucket that gets
+  // dipped into only if we can't fill the pool from other chapters.
+  var perChapCap = Math.max(3, Math.ceil(limit / 5));
+  var chapCount = {}, primary = [], reserve = [];
+  raw.forEach(function(c){
+    var u = c.q.unit || '—';
+    chapCount[u] = chapCount[u] || 0;
+    if(chapCount[u] < perChapCap){ chapCount[u]++; primary.push(c); }
+    else reserve.push(c);
+  });
+  var out = primary.concat(reserve);
+  return out;
+}
+
+// AI rerank: takes ~40 candidates, sends the student's profile + candidate list to the tutor,
+// asks for the top 25 ranked hardest-first for THIS specific student. Result is cached per Part
+// so repeatedly opening "Toughest for me" doesn't re-fire the call.
+var TOUGH_AI_CACHE_KEY = 'ea3quiz_v2_tough_ai_cache';
+function _toughAiCacheGet(){
+  try { return JSON.parse(localStorage.getItem(TOUGH_AI_CACHE_KEY)) || {}; } catch(e){ return {}; }
+}
+function _toughAiCacheSet(all){ try{ localStorage.setItem(TOUGH_AI_CACHE_KEY, JSON.stringify(all)); } catch(e){} }
+function _stableQHash(text){
+  var s = String(text || '');
+  var h = 5381;
+  for(var i=0;i<s.length;i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+async function aiRerankToughest(candidates, limit){
+  limit = limit || 25;
+  if(!candidates || candidates.length <= limit) return candidates; // nothing to rerank
+  // Only run for the admin (same gate as the tutor) — costs tokens
+  if(typeof isAdminUser !== 'function' || !isAdminUser()) return candidates;
+  var authObj = (typeof auth === 'function') ? auth() : null;
+  if(!authObj || !authObj.access_token) return candidates; // no auth = no AI
+
+  // Cache check — 6-hour freshness per Part, and refresh if the candidate set has drifted
+  var cacheKey = 'p' + (typeof PART!=='undefined'?PART:'?');
+  var all = _toughAiCacheGet();
+  var currentSig = candidates.map(function(c){ return _stableQHash(c.q.q); }).sort().join(',');
+  var currentHash = _stableQHash(currentSig);
+  var rec = all[cacheKey];
+  var freshMs = 6 * 60 * 60 * 1000;
+  if(rec && rec.t && (Date.now() - rec.t) < freshMs && rec.sig === currentHash && Array.isArray(rec.order)){
+    // Reorder from cached ranking
+    var byHash = {};
+    candidates.forEach(function(c){ byHash[_stableQHash(c.q.q)] = c; });
+    var ranked = rec.order.map(function(h){ return byHash[h]; }).filter(Boolean);
+    // Any candidates the cache didn't rank get appended at the end
+    var seen = {}; ranked.forEach(function(c){ seen[_stableQHash(c.q.q)] = true; });
+    candidates.forEach(function(c){ if(!seen[_stableQHash(c.q.q)]) ranked.push(c); });
+    return ranked.slice(0, limit);
+  }
+
+  // Build a compact rerank prompt
+  var stats = (typeof _computeLearningStats === 'function') ? null : null;
+  var perfLine = '';
+  try {
+    // Piggyback on the tutor's stat computation if available in scope, else recompute inline
+    var chap = {}, topic = {}, tot = 0, ok = 0;
+    for(var i=0;i<localStorage.length;i++){
+      var k=localStorage.key(i);
+      if(!/^ea3quiz_v2_(?:p[12]_)?(?:mock|mcq|extra)_/.test(k)) continue;
+      var s=null; try{s=JSON.parse(localStorage.getItem(k));}catch(e){continue;}
+      if(!s||!Array.isArray(s.answers)) continue;
+      // Skip: we already have chapAgg-like info baked into candidate.why.*
+    }
+    perfLine = 'The student has flagged and gotten questions wrong across multiple chapters. Their weak areas are indicated by "weak" flags on candidates.';
+  } catch(e){}
+
+  var listStr = candidates.map(function(c, idx){
+    var h = _stableQHash(c.q.q);
+    var whyBits = [];
+    if(c.why.repeatWrong)  whyBits.push('REPEAT-WRONG-2plus');
+    if(c.why.regression)   whyBits.push('REGRESSION-right-then-wrong');
+    if(c.why.recentWrong)  whyBits.push('RECENT-WRONG-3d');
+    if(c.why.wrong)        whyBits.push('WRONG');
+    if(c.why.flagged)      whyBits.push('FLAGGED');
+    if(c.why.doubleSignal) whyBits.push('WRONG+FLAGGED');
+    if(c.why.lowConf)      whyBits.push('low-confidence-fc');
+    if(c.why.weakChap)     whyBits.push('weak-chapter');
+    if(c.why.weakTopic)    whyBits.push('weak-topic');
+    if(typeof c.why.misconception==='number') whyBits.push('bias-picks-' + 'ABCD'.charAt(c.why.misconception));
+    if(c.why.fresh)        whyBits.push('unanswered');
+    return '[' + h + '] score=' + Math.round(c.score) + ' signals=' + whyBits.join('|') +
+           ' ch="' + (c.q.unit||'') + '" topic="' + (c.q.topic||'') + '" q="' + String(c.q.q||'').slice(0, 160).replace(/\n/g,' ') + '"';
+  }).join('\n');
+
+  // Also gather a compact misconception summary so the AI can plan a coherent progression
+  var mc = _computeMisconceptions();
+  var mcLines = Object.keys(mc).slice(0, 6).map(function(tp){
+    return '- ' + tp + ': student keeps picking option ' + 'ABCD'.charAt(mc[tp].bias) + ' when wrong (' + mc[tp].count + ' data points)';
+  }).join('\n');
+  var mcBlock = mcLines ? 'KNOWN MISCONCEPTIONS (dominant wrong-choice pattern by topic):\n' + mcLines + '\n\n' : '';
+
+  var prompt =
+    'You are building a personalized "toughest questions for me" quiz for an EA-exam student. ' +
+    'RANK the candidates below hardest-first FOR THIS SPECIFIC STUDENT, then return the top ' + limit + '.\n\n' +
+    'Signal legend (higher-priority first):\n' +
+    ' - REPEAT-WRONG-2plus: they have gotten this exact question wrong 2+ times → they are truly stuck\n' +
+    ' - REGRESSION-right-then-wrong: they had it right on a prior attempt but got it wrong most recently → confidence lost\n' +
+    ' - WRONG+FLAGGED: currently wrong AND marked for review → high-priority\n' +
+    ' - RECENT-WRONG-3d: got it wrong within the last 3 days → still fresh in confusion\n' +
+    ' - WRONG: current answer is wrong\n' +
+    ' - FLAGGED: student marked for review\n' +
+    ' - low-confidence-fc: they rated their flashcard confidence 1 or 2 out of 5\n' +
+    ' - weak-chapter / weak-topic: their overall accuracy in this area is below 70%\n' +
+    ' - bias-picks-X: on this topic the student consistently picks X when wrong (specific misconception)\n' +
+    ' - unanswered: fresh question in a weak area\n\n' +
+    mcBlock +
+    'CANDIDATES (one per line, [hash] = stable id):\n' + listStr + '\n\n' +
+    'Sequencing rules:\n' +
+    ' 1. Prioritize REPEAT-WRONG > REGRESSION > WRONG+FLAGGED > RECENT-WRONG > WRONG > FLAGGED+lowConf > weak-area\n' +
+    ' 2. Diversify across chapters/topics — no more than 2 in a row from the same chapter\n' +
+    ' 3. If the student has a known misconception on a topic, include at least 2 questions covering that topic\n' +
+    ' 4. Interleave: don\'t front-load all repeat-wrong questions (student will burn out); alternate difficulty\n\n' +
+    'Return ONLY a JSON object of the form: {"ids":["<hash1>","<hash2>", ...]} — exactly ' + limit +
+    ' hashes if available, ordered per the rules above. No prose, no code fences, just the JSON.';
+
+  var response = '';
+  try {
+    // Same CORS reason as the tutor's send(): skip Authorization until the worker's
+    // Access-Control-Allow-Headers is updated to include it.
+    var res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: prompt })
+    });
+    if(!res.ok || !res.body) return candidates;
+    var reader = res.body.getReader();
+    var decoder = new TextDecoder();
+    while(true){
+      var chunk = await reader.read();
+      if(chunk.done) break;
+      response += decoder.decode(chunk.value, { stream: true });
+    }
+  } catch(e){ return candidates; }
+
+  // Extract JSON — Gemini sometimes wraps in code fences
+  var jsonMatch = response.match(/\{[\s\S]*\}/);
+  if(!jsonMatch) return candidates;
+  var parsed = null;
+  try { parsed = JSON.parse(jsonMatch[0]); } catch(e){ return candidates; }
+  var ids = parsed && Array.isArray(parsed.ids) ? parsed.ids : null;
+  if(!ids || !ids.length) return candidates;
+
+  // Persist ranking
+  all[cacheKey] = { t: Date.now(), sig: currentHash, order: ids };
+  _toughAiCacheSet(all);
+
+  var byHash = {};
+  candidates.forEach(function(c){ byHash[_stableQHash(c.q.q)] = c; });
+  var ranked = ids.map(function(h){ return byHash[h]; }).filter(Boolean);
+  var seen = {}; ranked.forEach(function(c){ seen[_stableQHash(c.q.q)] = true; });
+  candidates.forEach(function(c){ if(!seen[_stableQHash(c.q.q)]) ranked.push(c); });
+  return ranked.slice(0, limit);
+}
+
+async function startToughestForMe(){
+  var poolLimit = 40; // send more candidates to the AI for reranking
+  var pool = collectToughestForMe(poolLimit);
+  if(!pool.length){
+    alert('Nothing to build yet — answer some questions first (and flag the ones that confused you). Then this will curate the hardest of them for you.');
+    return;
+  }
+  // Show a light loading state on the tile
+  var tileBtn = document.getElementById('toughBtn');
+  var originalSubEl = tileBtn && tileBtn.querySelector('.sub');
+  var originalSub = originalSubEl ? originalSubEl.textContent : '';
+  if(originalSubEl) originalSubEl.textContent = 'Ranking with AI…';
+  var items;
+  try {
+    items = await aiRerankToughest(pool, 25);
+  } catch(e) {
+    items = pool.slice(0, 25); // safe fallback
+  }
+  if(originalSubEl) originalSubEl.textContent = originalSub;
+  if(!items.length){ items = pool.slice(0, 25); }
+
+  exam = -10;
+  QUESTIONS = items.map(function(d){ return d.q; });
+  REVIEW_REFS = items.map(function(d){ return d.ref; });
+  st = makeState(QUESTIONS.length, QUESTIONS, true, 'practice');
+  st.review = true; pos = 0;
+  enterQuiz();
+}
+
 
 // ============================================================================
 // ==== FLASHCARDS (Brainscape-style CBR)
@@ -2989,7 +3395,7 @@ function headerScore(){
   const c=counts();
   document.getElementById('score').textContent='Score: '+c.right+'/'+c.ans;
 }
-function examName(){return exam===-2?'Smart Review':(exam===-3?UNITS[CHAP].name:(exam===-4?MCQS[MCH].name:(exam===-5?XTRA[XCH].name:(exam===-6?'Flagged Questions':(exam===-7?'Wrong Questions':(exam===-8?('Search: "'+(window._searchQuizTerm||'')+'"'):(exam===-9?'Wrong + Flagged (Shuffled)':EXAMS[exam].name)))))));}
+function examName(){return exam===-2?'Smart Review':(exam===-3?UNITS[CHAP].name:(exam===-4?MCQS[MCH].name:(exam===-5?XTRA[XCH].name:(exam===-6?'Flagged Questions':(exam===-7?'Wrong Questions':(exam===-8?('Search: "'+(window._searchQuizTerm||'')+'"'):(exam===-9?'Wrong + Flagged (Shuffled)':(exam===-10?'Toughest for Me':EXAMS[exam].name))))))));}
 function renderSide(){
   const c=counts();
   const fb=feedbackOn();
@@ -3070,7 +3476,14 @@ function render(){
   card.innerHTML='<div class="badges"><span class="badge">'+Q.topic+'</span><span class="badge unit">'+Q.unit+'</span>'+
     (exam<0&&REVIEW_REFS[qIdx]?'<span class="badge unit">'+REVIEW_REFS[qIdx].replace(/m(\d+)_(\d+)/,function(_,e,i){return 'Mock '+(+e+1)+' · Q'+(+i+1);})+'</span>':'')+
     '<button class="flagbtn'+(st.flags[qIdx]?' on':'')+'" id="flagBtn">⚑ '+(st.flags[qIdx]?'Flagged':'Flag')+'</button>'+
-    '<button class="flagbtn" id="askAiBtn" title="Ask AI to explain this question (shortcut: ? or i)">✨ Ask AI</button>'+
+    (function(){
+      // AI is gated: only the account owner (see ADMINS) gets the button.
+      if (typeof isAdminUser !== 'function' || !isAdminUser()) return '';
+      var isWrong = (st.answers[qIdx]!==null && st.answers[qIdx]!==Q.a && feedbackOn());
+      var label = isWrong ? '💡 Why did I get this wrong?' : '✨ Ask AI';
+      var cls = isWrong ? 'flagbtn askai-hot' : 'flagbtn';
+      return '<button class="'+cls+'" id="askAiBtn" data-hot="'+(isWrong?'1':'0')+'" title="Ask AI to explain this question (shortcut: ? or i)">'+label+'</button>';
+    })()+
     (st.answers[qIdx]!==null?'<button class="flagbtn" id="resetQBtn" title="Clear your answer for this question">↺ Reset</button>':'')+
     (canReveal()&&st.answers[qIdx]===null&&!st.revealAll?'<button class="flagbtn'+(isRevealed(qIdx)?' on':'')+'" id="seeAnsBtn">👁 '+(isRevealed(qIdx)?'Hide answer':'See answer')+'</button>':'')+'</div>'+
     '<div class="qtext">'+Q.q+'</div>'+
@@ -3099,8 +3512,11 @@ function render(){
       panel.classList.remove('minimized');
       if(window.innerWidth >= 1024) document.body.classList.add('ai-open');
     }
-    // Prefill and send
-    input.value='Explain this question in detail. Break down why the correct answer is right and why each wrong answer is wrong.';
+    // Prefill and send — targeted prompt if the student got this question wrong
+    var isHot = aab.getAttribute('data-hot') === '1';
+    input.value = isHot
+      ? 'I chose the wrong answer to this question. Explain why my choice is wrong and why the correct answer is right. Focus on the specific rule I got confused about, and give me a one-line way to remember it next time.'
+      : 'Explain this question in detail. Break down why the correct answer is right and why each wrong answer is wrong.';
     setTimeout(function(){sendBtn.click();},80);
   };
   var rqb=document.getElementById('resetQBtn');
@@ -3196,7 +3612,7 @@ function pick(dispJ){
   const qIdx=st.order[pos],Q=QUESTIONS[qIdx],perm=getPerm(qIdx);
   const orig=perm[dispJ];
   if(st.mode==='exam'&&!st.examDone){
-    st.answers[qIdx]=orig;recordAnswerToday();saveState();markSelection();renderSide();headerScore();
+    st.answers[qIdx]=orig;recordAnswerToday();recordAttempt(Q,orig);saveState();markSelection();renderSide();headerScore();
     const c=counts();document.getElementById('prog').style.width=(c.ans/QUESTIONS.length*100)+'%';
     return;
   }
@@ -3204,8 +3620,38 @@ function pick(dispJ){
   st.answers[qIdx]=orig;
   updateSrs(refOf(qIdx),orig===Q.a);
   recordAnswerToday();
+  recordAttempt(Q,orig);
   saveState();renderSide();showFeedback();headerScore();
   const c=counts();document.getElementById('prog').style.width=(c.ans/QUESTIONS.length*100)+'%';
+}
+
+// ---- Per-question attempt history (used by Toughest for Me) ----
+// Stored as { qHash: [{ts, c: chosenIdx, ok: 0|1}, …] } — keeps up to the last 5 attempts.
+// Different from st.answers which only remembers the LAST answer.
+var ATTEMPTS_KEY='ea3quiz_v2_attempts';
+function _qh(text){var s=String(text||''),h=5381;for(var i=0;i<s.length;i++)h=((h*33)^s.charCodeAt(i))>>>0;return h.toString(36);}
+function loadAttempts(){try{return JSON.parse(localStorage.getItem(ATTEMPTS_KEY))||{};}catch(e){return {};}}
+function saveAttempts(a){try{localStorage.setItem(ATTEMPTS_KEY,JSON.stringify(a));}catch(e){}}
+function recordAttempt(Q,chose){
+  try{
+    if(!Q||typeof chose!=='number')return;
+    var a=loadAttempts();
+    var k=_qh(Q.q);
+    if(!a[k])a[k]=[];
+    a[k].push({ts:Date.now(),c:chose,ok:(chose===Q.a)?1:0});
+    if(a[k].length>5)a[k]=a[k].slice(-5);
+    // Global cap: retain the 500 most-recently-touched questions to bound localStorage
+    var keys=Object.keys(a);
+    if(keys.length>500){
+      keys.sort(function(k1,k2){
+        var t1=a[k1][a[k1].length-1].ts||0,t2=a[k2][a[k2].length-1].ts||0;
+        return t2-t1;
+      });
+      var kept={};keys.slice(0,500).forEach(function(k){kept[k]=a[k];});
+      a=kept;
+    }
+    saveAttempts(a);
+  }catch(e){}
 }
 function showFeedback(){
   const qIdx=st.order[pos],Q=QUESTIONS[qIdx],perm=getPerm(qIdx);
@@ -4287,6 +4733,7 @@ __boot();
      stretched full-height and the empty body shows through. */
   #ai-tutor-panel.minimized{height:auto !important; top:auto !important; bottom:24px !important;}
   #ai-tutor-panel.minimized #ai-tutor-messages,
+  #ai-tutor-panel.minimized #ai-tutor-quicks,
   #ai-tutor-panel.minimized #ai-tutor-input-wrap{display:none;}
   #ai-tutor-close{cursor:pointer;font-size:20px;line-height:1;color:var(--muted);transition:color .2s;}
   #ai-tutor-close:hover{color:var(--ink);}
@@ -4353,6 +4800,7 @@ __boot();
   @media(max-width:500px){
     #ai-tutor-panel{
       width:100vw !important;
+      max-width:100vw !important;
       height:100dvh !important;
       max-height:100dvh !important;
       bottom:0 !important;
@@ -4437,7 +4885,33 @@ __boot();
     if(window.innerWidth >= 1024) document.body.classList.toggle('ai-open', open);
     else document.body.classList.remove('ai-open');
   }
+  // AI access gate — only the account owner (ADMINS list, currently ['rafay']) sees the AI at all.
+  // This hides the floating button entirely for other users. NOTE: for full protection the worker
+  // itself would need an auth check; this is client-side gating for casual restriction.
+  function _aiAllowed(){
+    try { return typeof isAdminUser === 'function' && isAdminUser(); } catch(e) { return false; }
+  }
+  function _refreshAiVisibility(){
+    if (!_aiAllowed()) {
+      btn.style.display = 'none';
+      panel.style.display = 'none';
+      document.body.classList.remove('ai-open');
+    } else {
+      // Only show floating button if panel isn't already open
+      if (panel.style.display !== 'flex') btn.style.display = 'flex';
+    }
+  }
+  // Re-check on account state changes (sign in/out re-fires renderAcct)
+  const _origRenderAcct = window.renderAcct;
+  if (typeof _origRenderAcct === 'function') {
+    window.renderAcct = function(){ _origRenderAcct.apply(this, arguments); _refreshAiVisibility(); };
+  }
+  // Initial check
+  setTimeout(_refreshAiVisibility, 200);
+  setTimeout(_refreshAiVisibility, 1500); // in case auth loads later
+
   btn.onclick = () => {
+    if (!_aiAllowed()) { _refreshAiVisibility(); return; }
     panel.style.display = 'flex'; btn.style.display = 'none'; panel.classList.remove('minimized'); _setAiOpen(true);
     // Restore this question's saved conversation, if any
     try { _lastQHash = ''; _syncChatToCurrentQuestion(); } catch(e) {}
@@ -4540,6 +5014,327 @@ __boot();
     messages.scrollTop = messages.scrollHeight;
   }
 
+  // ---- Learning profile + weak areas (computed live from all localStorage state) ----
+  // Iterates every mock/mcq/extra key and counts wrong answers per topic + chapter.
+  // Cheap enough to run on every send (~1000 questions max).
+  function _computeLearningStats(){
+    const out = { totalAns: 0, totalRight: 0, byTopic: {}, byChapter: {}, byPart: {} };
+    try {
+      // Walk all synced keys and inspect anything that looks like question state
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!/^ea3quiz_v2_(?:p[12]_)?(?:mock|mcq|extra|unit)_/.test(key)) continue;
+        let s = null;
+        try { s = JSON.parse(localStorage.getItem(key)); } catch(e) { continue; }
+        if (!s || !Array.isArray(s.answers)) continue;
+        // Figure out which part this key belongs to
+        const partMatch = key.match(/ea3quiz_v2_(p([12])_)?/);
+        const partNum = partMatch && partMatch[2] ? +partMatch[2] : 3;
+        // Try to look up the corresponding question array — this is best-effort;
+        // if we can't find it we skip the aggregation cleanly.
+        // For mcq/extra we need the group index and part; for mock same.
+        const m = key.match(/(?:mock|mcq|extra|unit)_(\d+)$/);
+        if (!m) continue;
+        const gi = +m[1];
+        let questions = null;
+        try {
+          const parts = (typeof PARTS !== 'undefined') ? PARTS : null;
+          if (!parts || !parts[partNum]) continue;
+          if (/mock_/.test(key)) questions = parts[partNum].exams && parts[partNum].exams[gi] && parts[partNum].exams[gi].questions;
+          else if (/mcq_/.test(key)) questions = parts[partNum].mcqs && parts[partNum].mcqs[gi] && parts[partNum].mcqs[gi].questions;
+          else if (/extra_/.test(key)) questions = parts[partNum].extra && parts[partNum].extra[gi] && parts[partNum].extra[gi].questions;
+          else if (/unit_/.test(key)) continue; // chapter-from-mocks — skip, aggregated via mocks already
+        } catch(e){}
+        if (!Array.isArray(questions)) continue;
+        s.answers.forEach((v, j) => {
+          if (v === null || v === undefined) return;
+          const q = questions[j];
+          if (!q) return;
+          const right = (v === q.a);
+          out.totalAns++;
+          if (right) out.totalRight++;
+          const topic = q.topic || 'General';
+          if (!out.byTopic[topic]) out.byTopic[topic] = { a: 0, r: 0 };
+          out.byTopic[topic].a++; if (right) out.byTopic[topic].r++;
+          const chap = q.unit || 'Unknown';
+          if (!out.byChapter[chap]) out.byChapter[chap] = { a: 0, r: 0 };
+          out.byChapter[chap].a++; if (right) out.byChapter[chap].r++;
+          if (!out.byPart[partNum]) out.byPart[partNum] = { a: 0, r: 0 };
+          out.byPart[partNum].a++; if (right) out.byPart[partNum].r++;
+        });
+      }
+    } catch(e) {}
+    return out;
+  }
+  // Detect meta questions about the student's own performance — these need the full profile
+  // regardless of what the current question is.
+  const META_RE = /\b(weak|weakest|worst|struggl\w*|strong|strongest|best|top|lowest|highest|progress|performance|score|scores|accuracy|stat|stats|status|improve|focus|study more|how am i|how am I|which topics|which chapters|which areas|what should i|what should I|what am i (bad|good|weakest|strongest)|my (weakest|strongest|worst|best)|behind|ahead|target|flagged|wrong|missed|got wrong|need to review|which questions)/i;
+
+  // Collect the ACTUAL wrong/flagged questions across all parts, grouped by chapter/topic,
+  // so the tutor can point at specific items instead of just aggregate stats.
+  function _collectWrongFlagged(){
+    const out = { wrongByChap: {}, flagByChap: {}, wrongByTopic: {}, wrongSamples: [], totalWrong: 0, totalFlagged: 0 };
+    try {
+      const parts = (typeof PARTS !== 'undefined') ? PARTS : null;
+      if (!parts) return out;
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (!/^ea3quiz_v2_(?:p[12]_)?(?:mock|mcq|extra)_/.test(key)) continue;
+        let s = null;
+        try { s = JSON.parse(localStorage.getItem(key)); } catch(e) { continue; }
+        if (!s || !Array.isArray(s.answers)) continue;
+        const pm = key.match(/ea3quiz_v2_(p([12])_)?/);
+        const partNum = pm && pm[2] ? +pm[2] : 3;
+        const m = key.match(/(mock|mcq|extra)_(\d+)$/);
+        if (!m) continue;
+        const kind = m[1]; const gi = +m[2];
+        if (!parts[partNum]) continue;
+        let questions = null;
+        if (kind === 'mock')  questions = parts[partNum].exams  && parts[partNum].exams[gi]  && parts[partNum].exams[gi].questions;
+        else if (kind === 'mcq')   questions = parts[partNum].mcqs   && parts[partNum].mcqs[gi]   && parts[partNum].mcqs[gi].questions;
+        else if (kind === 'extra') questions = parts[partNum].extra  && parts[partNum].extra[gi] && parts[partNum].extra[gi].questions;
+        if (!Array.isArray(questions)) continue;
+        s.answers.forEach((v, j) => {
+          const q = questions[j]; if (!q) return;
+          const chap = q.unit || 'Unknown';
+          const topic = q.topic || 'General';
+          if (v !== null && v !== undefined && v !== q.a) {
+            out.totalWrong++;
+            out.wrongByChap[chap]  = (out.wrongByChap[chap]  || 0) + 1;
+            out.wrongByTopic[topic] = (out.wrongByTopic[topic] || 0) + 1;
+            if (out.wrongSamples.length < 10) {
+              out.wrongSamples.push({ chap, topic, q: String(q.q || '').slice(0, 100) });
+            }
+          }
+          if (s.flags && s.flags[j]) {
+            out.totalFlagged++;
+            out.flagByChap[chap] = (out.flagByChap[chap] || 0) + 1;
+          }
+        });
+      }
+    } catch(e) {}
+    return out;
+  }
+
+  function _learningProfileContext(currentQ, userQuery){
+    try {
+      const s = _computeLearningStats();
+      if (s.totalAns < 5) return ''; // too little data even for a meta question
+      const isMeta = userQuery && META_RE.test(userQuery);
+
+      // Compute rankings once
+      const chapters = Object.entries(s.byChapter)
+        .filter(([, v]) => v.a >= 3)
+        .map(([k, v]) => ({ k, acc: v.r / v.a, a: v.a, r: v.r }))
+        .sort((a, b) => a.acc - b.acc);
+      const topics = Object.entries(s.byTopic)
+        .filter(([, v]) => v.a >= 3)
+        .map(([k, v]) => ({ k, acc: v.r / v.a, a: v.a, r: v.r }))
+        .sort((a, b) => a.acc - b.acc);
+
+      // Meta questions: send the full, detailed profile so the tutor can answer directly.
+      if (isMeta) {
+        const acc = Math.round(100 * s.totalRight / s.totalAns);
+        const wf = _collectWrongFlagged();
+        let out = 'STUDENT\'S FULL PERFORMANCE PROFILE (the student is asking about this — use it directly):\n';
+        out += '- Overall: ' + s.totalRight + '/' + s.totalAns + ' correct (' + acc + '%) across all attempted questions.\n';
+        out += '- Wrong-answer bank: ' + wf.totalWrong + ' questions currently marked wrong (they are "to retry"). Flagged bank: ' + wf.totalFlagged + ' questions manually flagged for review.\n';
+        // By part
+        const partNames = { 1: 'Part 1 (Individuals)', 2: 'Part 2 (Businesses)', 3: 'Part 3 (Representation)' };
+        const partRows = Object.entries(s.byPart)
+          .map(([p, v]) => ({ p: +p, acc: v.r / v.a, a: v.a, r: v.r }))
+          .sort((a, b) => a.p - b.p);
+        if (partRows.length) {
+          out += '- By exam Part: ' + partRows.map(p =>
+            partNames[p.p] + ' ' + p.r + '/' + p.a + ' (' + Math.round(100 * p.acc) + '%)'
+          ).join('; ') + '.\n';
+        }
+        // Chapters ranked by wrong count (most concrete signal — actual missed questions)
+        const wrongChapRows = Object.entries(wf.wrongByChap)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 6);
+        if (wrongChapRows.length) {
+          out += '- Chapters with the MOST wrong answers: ' + wrongChapRows.map(([c, n]) =>
+            c + ' (' + n + ' wrong)'
+          ).join('; ') + '.\n';
+        }
+        // Chapters ranked by flag count
+        const flagChapRows = Object.entries(wf.flagByChap)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5);
+        if (flagChapRows.length) {
+          out += '- Chapters with the MOST flagged questions: ' + flagChapRows.map(([c, n]) =>
+            c + ' (' + n + ' flagged)'
+          ).join('; ') + '.\n';
+        }
+        // Weakest by accuracy (chapters and topics with ≥3 attempts)
+        if (chapters.length) {
+          out += '- Lowest-accuracy chapters (attempted ≥3): ' + chapters.slice(0, 5).map(c =>
+            c.k + ' ' + c.r + '/' + c.a + ' (' + Math.round(100 * c.acc) + '%)'
+          ).join('; ') + '.\n';
+        }
+        if (topics.length) {
+          out += '- Lowest-accuracy topics (attempted ≥3): ' + topics.slice(0, 5).map(t =>
+            t.k + ' ' + t.r + '/' + t.a + ' (' + Math.round(100 * t.acc) + '%)'
+          ).join('; ') + '.\n';
+        }
+        // Sample of actual missed question snippets so tutor can reference them
+        if (wf.wrongSamples.length) {
+          out += '- Sample of specific wrong questions:\n';
+          wf.wrongSamples.slice(0, 6).forEach((w, i) => {
+            out += '  ' + (i + 1) + '. [' + w.chap + ' · ' + w.topic + '] ' + w.q + '\n';
+          });
+        }
+        out += '(Answer the student\'s meta question directly from this data. Name specific chapters/topics and cite the actual numbers. Give concrete study advice tied to their real performance. If they ask "what am I weakest in," lead with the chapters that have the most wrong+flagged questions.)\n\n';
+        return out;
+      }
+
+      // Non-meta: only include when the current question itself sits in a weak area
+      const currentTopic = (currentQ && currentQ.topic) || '';
+      const currentUnit  = (currentQ && currentQ.unit)  || '';
+      const topicStats = s.byTopic[currentTopic];
+      const unitStats  = s.byChapter[currentUnit];
+      const topicWeak = topicStats && topicStats.a >= 3 && (topicStats.r / topicStats.a) < 0.7;
+      const unitWeak  = unitStats  && unitStats.a  >= 3 && (unitStats.r  / unitStats.a ) < 0.7;
+      if (!topicWeak && !unitWeak) return '';
+      let out = 'LEARNING PROFILE (this question is in a weak area for the student):\n';
+      if (unitWeak)  out += '- Weak chapter: ' + currentUnit  + ' — ' + unitStats.r  + '/' + unitStats.a  + ' correct (' + Math.round(100 * unitStats.r  / unitStats.a)  + '%).\n';
+      if (topicWeak) out += '- Weak topic: '   + currentTopic + ' — ' + topicStats.r + '/' + topicStats.a + ' correct (' + Math.round(100 * topicStats.r / topicStats.a) + '%).\n';
+      out += '(Name this connection explicitly and teach the underlying rule, not just the answer.)\n\n';
+      return out;
+    } catch(e) { return ''; }
+  }
+
+  // ---- Cross-question memory: find prior chats on the same topic/chapter ----
+  function _crossQuestionContext(currentQ){
+    try {
+      if (!currentQ) return '';
+      const currentHash = _questionHash(currentQ);
+      const all = _loadAllChats();
+      const related = [];
+      const topic = (currentQ.topic || '').toLowerCase();
+      const unit  = (currentQ.unit  || '').toLowerCase();
+      // We stored chats by question-text hash, so to find "same topic" chats we'd need
+      // to keep a small side-index. Cheap approach: iterate saved chats and, for each,
+      // look up the topic from the message content (bot responses typically mention topic keywords).
+      // Better: at save time, also store the question's topic + unit alongside. Do that now
+      // by upgrading records lazily as they're read.
+      Object.entries(all).forEach(([k, rec]) => {
+        if (k === currentHash) return;
+        if (!rec || !Array.isArray(rec.m)) return;
+        // Prefer the stored topic/unit if we already added it; fall back to scanning first user msg
+        const recTopic = (rec.topic || '').toLowerCase();
+        const recUnit  = (rec.unit  || '').toLowerCase();
+        let match = false;
+        if (recTopic && topic && recTopic === topic) match = true;
+        else if (recUnit && unit && recUnit === unit) match = true;
+        if (!match) return;
+        // Extract a compact summary: the LAST bot message truncated
+        const lastBot = [...rec.m].reverse().find(b => b.r === 'b');
+        if (!lastBot) return;
+        const plain = String(lastBot.t).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        related.push({ t: rec.t || 0, s: plain.slice(0, 200) });
+      });
+      related.sort((a, b) => b.t - a.t);
+      // Only include when there are 2+ related chats — otherwise it's just noise
+      if (related.length < 2) return '';
+      const top = related.slice(0, 2);
+      let out = 'PRIOR CHATS ON THIS TOPIC (previous discussions with this student on the same topic/chapter):\n';
+      top.forEach((r, i) => {
+        const s = r.s.slice(0, 150);
+        out += (i+1) + '. ' + s + (r.s.length > 150 ? '…' : '') + '\n';
+      });
+      out += '(If you\'re about to repeat something already covered, acknowledge it and go deeper instead.)\n\n';
+      return out;
+    } catch(e) { return ''; }
+  }
+  // Upgrade the saveChatForCurrentQ helper to also stamp topic/unit into each record
+  // so cross-question memory can find related chats. Small wrapper on top of the
+  // existing function.
+  const _origSave = saveChatForCurrentQ;
+  saveChatForCurrentQ = function(){
+    try {
+      const q = _currentQuestion();
+      if (!q) return _origSave();
+      _origSave();
+      // Now annotate the just-saved record with topic + unit
+      const key = _questionHash(q);
+      if (!key) return;
+      const all = _loadAllChats();
+      if (all[key]) {
+        all[key].topic = q.topic || '';
+        all[key].unit  = q.unit  || '';
+        _saveAllChats(all);
+      }
+    } catch(e) { try { _origSave(); } catch(_){} }
+  };
+
+  // ---- Client-side RAG: search across ALL chapter notes for keyword-matched sections ----
+  // Not real semantic RAG (would need embeddings + a worker) — but a solid keyword-overlap
+  // approach that finds relevant sections anywhere in the study guide, not just the current chapter.
+  const _STOPWORDS = new Set(('a an the of in on to for and or is are was were be been being ' +
+    'this that these those it its as by with from at have has had do does did which what who ' +
+    'when where why how not no can may will would should could taxpayer question following').split(' '));
+  function _keywords(text){
+    return String(text).toLowerCase()
+      .replace(/[^a-z0-9§]+/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length >= 3 && !_STOPWORDS.has(w));
+  }
+  function _sectionText(sec){
+    // Sections in CHNOTES have shape { t, l, i: [ [type, content], ... ] }
+    if (!sec) return '';
+    let out = String(sec.t || '');
+    if (Array.isArray(sec.i)) {
+      sec.i.forEach(item => {
+        if (Array.isArray(item)) out += ' ' + item.join(' ');
+        else if (typeof item === 'string') out += ' ' + item;
+      });
+    }
+    return out;
+  }
+  function _ragSearch(currentQ, maxHits){
+    try {
+      if (typeof CHNOTES === 'undefined' || !CHNOTES || typeof PART === 'undefined') return '';
+      const notes = CHNOTES[PART];
+      if (!notes) return '';
+      // Build the query terms from the question + all answer options + topic
+      const queryParts = [currentQ.q || ''];
+      (currentQ.opts || []).forEach(o => queryParts.push(o));
+      if (currentQ.topic) queryParts.push(currentQ.topic);
+      const qWords = new Set(_keywords(queryParts.join(' ')));
+      if (!qWords.size) return '';
+      // Score every section across every chapter
+      const scored = [];
+      Object.entries(notes).forEach(([chNum, ch]) => {
+        if (!ch || !Array.isArray(ch.s)) return;
+        ch.s.forEach((sec, si) => {
+          const text = _sectionText(sec);
+          const wds = _keywords(text);
+          if (!wds.length) return;
+          let hits = 0;
+          const seen = new Set();
+          wds.forEach(w => { if (qWords.has(w) && !seen.has(w)) { hits++; seen.add(w); } });
+          if (hits < 2) return; // require at least 2 distinct keyword overlaps
+          // Score: hits per unique term seen in section (favors focused sections)
+          const score = hits + Math.min(hits / Math.max(1, wds.length) * 5, 3);
+          const snippet = text.slice(0, 400);
+          scored.push({ chNum, chTitle: ch.t || '', sec: sec.t || '', score, snippet });
+        });
+      });
+      scored.sort((a, b) => b.score - a.score);
+      const top = scored.slice(0, maxHits || 2);
+      if (!top.length) return '';
+      let out = 'RETRIEVED STUDY-GUIDE PASSAGES (relevant sections from anywhere in the book, not just the current chapter):\n';
+      top.forEach((h, i) => {
+        const snip = h.snippet.slice(0, 250);
+        out += (i+1) + '. Ch ' + h.chNum + ' (' + h.chTitle + ') § "' + h.sec + '": ' + snip.replace(/\s+/g,' ').trim() + (h.snippet.length > 250 ? '…' : '') + '\n';
+      });
+      out += '\n';
+      return out;
+    } catch(e) { return ''; }
+  }
+
   // ---- Chapter notes context builder (grounds tutor in the study guide) ----
   function _chapterNotesContext(q){
     try{
@@ -4567,8 +5362,8 @@ __boot();
         const secs = ch.s.map(x => (x.t || '').trim()).filter(Boolean).slice(0, 12);
         if (secs.length) out += 'Sections: ' + secs.join(' · ') + '\n';
       }
-      // Hard cap so we don't blow up token cost
-      if (out.length > 2000) out = out.slice(0, 2000) + '…\n';
+      // Hard cap — 800 chars is enough for title + forms + a few facts + section names
+      if (out.length > 800) out = out.slice(0, 800) + '…\n';
       return out + '\n';
     }catch(e){ return ''; }
   }
@@ -4626,9 +5421,27 @@ __boot();
   // Minimal markdown → HTML renderer (safe: escapes HTML first)
 
   // ---- Markdown renderer (used for bot messages) ----
+  // Split inline bullet-list runs like "* item1 * item2 * item3" into proper
+  // newline-separated markdown so the list parser can render them.
+  // Only fires when we see 3+ " * " tokens in a stretch — protects real emphasis.
+  function normalizeInlineLists(text){
+    return text.replace(/(^|\n)([^\n]*?(?: \* [^\n]+){2,}[^\n]*)/g, (m, pre, run) => {
+      // Split on " * " but keep the leading text before the first " * " as-is
+      const idx = run.indexOf(' * ');
+      if (idx < 0) return m;
+      const head = run.slice(0, idx).trim();
+      const rest = run.slice(idx + 3);
+      const items = rest.split(/ \* /);
+      const bullets = items.map(x => '* ' + x.trim()).join('\n');
+      return pre + (head ? head + '\n' : '') + bullets;
+    });
+  }
+
   function renderMarkdown(text) {
     // Translate LaTeX commands into Unicode first
     text = stripLatex(text);
+    // Split inline "* a * b * c" bullet runs onto their own lines
+    text = normalizeInlineLists(text);
     // Escape HTML
     let html = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     // Code blocks
@@ -4714,12 +5527,48 @@ __boot();
       }
     }
 
+    // Access gate — belt and suspenders in case the UI check was bypassed.
+    if (!_aiAllowed()) {
+      const gate = document.createElement('div');
+      gate.className = 'ai-msg bot';
+      gate.innerHTML = '<strong>AI Tutor is disabled on this account.</strong><br>Only the account owner can use the AI tutor. Ask Rafay if you need access.';
+      messages.appendChild(gate);
+      input.value = '';
+      return;
+    }
+
     addMsg(q, true);
     // Persist immediately so the user's question survives a mid-response close/refresh
     try { saveChatForCurrentQ(); } catch(e) {}
     input.value = '';
     input.style.height = 'auto';
     sendBtn.disabled = true;
+
+    // ---- RESPONSE CACHE ----
+    // If this exact prompt was asked on this exact question and got a good answer before,
+    // just replay the answer — zero API cost. Only applies when there's no follow-up
+    // context to worry about (i.e., first message on the question, or a repeated quick-action).
+    const _cq = _currentQuestion();
+    const _cacheKey = _cq ? (_questionHash(_cq) + '::' + _promptFingerprint(q)) : '';
+    if (_cacheKey) {
+      try {
+        const cache = JSON.parse(localStorage.getItem('ea3quiz_v2_ai_resp_cache') || '{}');
+        const hit = cache[_cacheKey];
+        if (hit && hit.r && hit.r.length > 40) {
+          // Replay the cached answer instantly, no fetch, no billing
+          const div = document.createElement('div');
+          div.className = 'ai-msg bot';
+          div.innerHTML = renderMarkdown(hit.r);
+          messages.appendChild(div);
+          messages.scrollTop = messages.scrollHeight;
+          try { saveChatForCurrentQ(); } catch(e) {}
+          sendBtn.disabled = false;
+          input.focus();
+          return;
+        }
+      } catch(e) {}
+    }
+
     const typing = addTyping();
 
     // Increment usage counter (for non-admin users)
@@ -4779,6 +5628,10 @@ __boot();
         context += '\n';
         // Chapter notes — pull the study guide's own notes for the chapter this question belongs to
         context += _chapterNotesContext(currentQ);
+        // Client-side RAG: pull the top ~3 most relevant sections from ANYWHERE in the book
+        context += _ragSearch(currentQ, 2);
+        // Cross-question memory: prior discussions on this same topic/chapter
+        context += _crossQuestionContext(currentQ);
       } else {
         // Fallback: fall back to DOM scraping (no quiz view detected)
         const qtextEl = document.querySelector('.qtext');
@@ -4833,6 +5686,7 @@ __boot();
       'End with a one-line "**Key takeaway:**" that captures the rule the student should memorize.\n\n' +
       'DO NOT emit LaTeX ($\\rightarrow$, $\\leq$, $\\alpha$, etc.). Write real characters: →, ≤, α. ' +
       'DO NOT restate the question back to the student verbatim — go straight into the explanation.\n\n' +
+      _learningProfileContext(_cq, q) +
       historyBlock +
       context +
       'STUDENT QUESTION (this turn): ' + q;
@@ -4841,9 +5695,19 @@ __boot();
     // Streaming render is debounced via requestAnimationFrame — one paint per frame
     // instead of one per network chunk. Big speed win on long answers.
     async function attemptRequest() {
+      // NOTE: Authorization header is intentionally NOT sent until the worker's CORS
+      // Access-Control-Allow-Headers is updated to include "Authorization". Sending it
+      // triggers a preflight the current worker rejects, and the whole fetch fails.
+      // Once you deploy the worker CORS patch (adds "Authorization" to allowed headers),
+      // re-enable the block below.
+      const _headers = { 'Content-Type': 'application/json' };
+      // try {
+      //   const _a = (typeof auth === 'function') ? auth() : null;
+      //   if (_a && _a.access_token) _headers['Authorization'] = 'Bearer ' + _a.access_token;
+      // } catch(e) {}
       const res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: _headers,
         body: JSON.stringify({ prompt: fullPrompt })
       });
       if (!res.ok || !res.body) return '';
@@ -4881,7 +5745,41 @@ __boot();
     sendBtn.disabled = false;
     // Save the completed exchange so the conversation reappears next time
     try { saveChatForCurrentQ(); } catch(e) {}
+    // Write to the response cache so an identical repeat won't burn tokens
+    try {
+      if (_cacheKey) {
+        // Read the last bot message (what the tutor just wrote)
+        const bots = messages.querySelectorAll('.ai-msg.bot');
+        const last = bots[bots.length - 1];
+        const bodyText = (last && last.innerText || '').trim();
+        if (bodyText.length > 40 && !/^Error:|^The AI is busy/.test(bodyText)) {
+          const cache = JSON.parse(localStorage.getItem('ea3quiz_v2_ai_resp_cache') || '{}');
+          cache[_cacheKey] = { r: bodyText, t: Date.now() };
+          // LRU: keep newest 100 entries
+          const keys = Object.keys(cache);
+          if (keys.length > 100) {
+            const kept = keys
+              .map(k => ({ k, t: cache[k].t || 0 }))
+              .sort((a, b) => b.t - a.t)
+              .slice(0, 100)
+              .reduce((acc, x) => { acc[x.k] = cache[x.k]; return acc; }, {});
+            localStorage.setItem('ea3quiz_v2_ai_resp_cache', JSON.stringify(kept));
+          } else {
+            localStorage.setItem('ea3quiz_v2_ai_resp_cache', JSON.stringify(cache));
+          }
+        }
+      }
+    } catch(e) {}
     input.focus();
+  }
+  // Prompt fingerprint used by the response cache — collapse whitespace + lowercase so
+  // trivial rewordings still hit the cache. This is per-question, so distinct questions
+  // can share fingerprints without collision.
+  function _promptFingerprint(txt){
+    const s = String(txt || '').toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 300);
+    let h = 5381;
+    for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+    return h.toString(36);
   }
 
   sendBtn.onclick = send;
@@ -4928,6 +5826,10 @@ __boot();
         panel.style.width = saved.w + 'px';
         document.documentElement.style.setProperty('--ai-panel-w', saved.w + 'px');
       }
+    } else {
+      // Mobile: clear any inline width so the CSS mobile rule (100vw) wins cleanly
+      panel.style.width = '';
+      panel.style.height = '';
     }
   } catch(e) {}
 
