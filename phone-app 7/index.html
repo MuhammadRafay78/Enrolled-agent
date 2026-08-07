@@ -1648,10 +1648,11 @@ function renderAdminPanel(){
         if(pend.length){
           html+='<div style="font-size:12px;color:var(--muted);margin:4px 0 4px">PENDING</div>';
           pend.forEach(function(p){
-            html+='<div class="mstat" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;margin-bottom:6px">'+
+            html+='<div class="mstat" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;margin-bottom:6px;flex-wrap:wrap">'+
               '<span><b>'+esc(p.name)+'</b> <span style="color:var(--muted);font-size:12px">requested '+new Date(p.requested_at).toLocaleDateString()+'</span></span>'+
-              '<span style="display:flex;gap:6px">'+
-              '<button class="mpill" data-au-approve="'+esc(p.name)+'" style="background:var(--green-bg);color:var(--green);border-color:var(--green)">Approve</button>'+
+              '<span style="display:flex;gap:6px;flex-wrap:wrap">'+
+              '<button class="mpill" data-au-approve="'+esc(p.name)+'" style="background:var(--green-bg);color:var(--green);border-color:var(--green)">Approve · Full</button>'+
+              '<button class="mpill" data-au-demo="'+esc(p.name)+'" style="background:rgba(59,130,246,.12);color:var(--blue);border-color:var(--blue)">Approve · Demo 15m</button>'+
               '<button class="mpill" data-au-reject="'+esc(p.name)+'" style="background:var(--red-bg);color:var(--red);border-color:var(--red)">Reject</button>'+
               '</span></div>';
           });
@@ -1681,6 +1682,20 @@ function renderAdminPanel(){
         };
         box.querySelectorAll('[data-au-approve]').forEach(function(b){
           b.onclick=async function(e){ e.stopPropagation(); b.disabled=true; var ok=await approveUser(b.dataset.auApprove); if(ok){box.remove(); (typeof showParts==='function'?showParts:showMenu)();} else { alert('Approve failed'); b.disabled=false; } };
+        });
+        box.querySelectorAll('[data-au-demo]').forEach(function(b){
+          b.onclick=async function(e){
+            e.stopPropagation();
+            if(!confirm('Approve '+b.dataset.auDemo+' with a 15-minute demo cap? They will be signed out after 15 minutes and need you to upgrade them for full access.'))return;
+            b.disabled=true;
+            var res=await approveUserAsDemo(b.dataset.auDemo);
+            if(res && res.ok){ box.remove(); (typeof showParts==='function'?showParts:showMenu)(); }
+            else if(res && res.needsMigration){
+              alert('Your Supabase table is missing the "demo" column. Run this ONCE in the Supabase SQL editor, then try again:\n\nALTER TABLE approvals ADD COLUMN IF NOT EXISTS demo boolean DEFAULT false;');
+              b.disabled=false;
+            }
+            else { alert('Demo approval failed'); b.disabled=false; }
+          };
         });
         box.querySelectorAll('[data-au-reject]').forEach(function(b){
           b.onclick=async function(e){ e.stopPropagation(); if(!confirm('Reject '+b.dataset.auReject+'?'))return; b.disabled=true; var ok=await rejectUser(b.dataset.auReject); if(ok){box.remove(); (typeof showParts==='function'?showParts:showMenu)();} else { alert('Reject failed'); b.disabled=false; } };
