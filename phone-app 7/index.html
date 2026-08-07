@@ -13,7 +13,7 @@
   :root{--bg:#f4f6f9;--card:#fff;--ink:#1a2332;--muted:#64748b;--blue:#2563eb;--green:#16a34a;--green-bg:#f0fdf4;--red:#dc2626;--red-bg:#fef2f2;--border:#e2e8f0;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;padding:24px 16px;}
-  .wrap{max-width:1000px;margin:0 auto;}
+  .wrap{max-width:880px;margin:0 auto;}
   .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;color:var(--muted);}
   .score-chip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-weight:600;color:var(--ink);}
   .bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:20px;}
@@ -1380,6 +1380,58 @@ function streakTotal(){
 var SUPA={url:'https://ebztmghojfiuigkvwfvr.supabase.co',
           key:'sb_publishable_pRmvgWWZqjXLW2B667yDmA_No2AY18T'};
 var AUTHK='ea3quiz_auth', METAK='ea3quiz_meta';
+// ---- Demo access (per-account, 15 minutes, gated by admin approval) ----
+// Requires an admin to approve the signup with the "demo" flag. The demo timer
+// starts on the demo user's first sign-in on any device and runs for DEMO_MINUTES.
+// Server side needs one extra column on the approvals table:
+//   ALTER TABLE approvals ADD COLUMN IF NOT EXISTS demo boolean DEFAULT false;
+// If the column doesn't exist yet, everyone is treated as full-access (safe default).
+var DEMO_KEY='ea3quiz_demo';
+var DEMO_MINUTES=15;
+var DEMO_AI_LIMIT=5;   // demo users may ask up to 5 AI Tutor questions during their session
+function demoAiUsed(){ try{ var d=JSON.parse(localStorage.getItem(DEMO_KEY))||{}; return +(d.aiUsed||0); }catch(e){ return 0; } }
+function demoAiRemaining(){ return Math.max(0, DEMO_AI_LIMIT - demoAiUsed()); }
+function bumpDemoAi(){
+  try{
+    var d=JSON.parse(localStorage.getItem(DEMO_KEY))||{};
+    d.aiUsed=(+(d.aiUsed||0))+1;
+    localStorage.setItem(DEMO_KEY, JSON.stringify(d));
+  }catch(e){}
+}
+function demoInfo(){
+  try{
+    var d=JSON.parse(localStorage.getItem(DEMO_KEY)); if(!d||!d.start)return null;
+    var dur=(d.duration||DEMO_MINUTES*60000);
+    var remaining=Math.max(0, d.start+dur-Date.now());
+    return { active: remaining>0, remaining: remaining, expired: remaining<=0, start: d.start, duration: dur, forEmail: d.forEmail||'' };
+  }catch(e){ return null; }
+}
+function isDemoActive(){
+  var d=demoInfo(); if(!d||!d.active) return false;
+  // Only counts if it matches the currently signed-in email (or was set with no email)
+  var a=auth(); var email=(a&&a.email)||'';
+  return !d.forEmail || d.forEmail===email;
+}
+function isDemoExpired(){
+  var d=demoInfo(); if(!d) return false;
+  var a=auth(); var email=(a&&a.email)||'';
+  if(d.forEmail && d.forEmail!==email) return false;
+  return d.expired;
+}
+function startDemoForCurrentUser(){
+  var a=auth(); if(!a) return;
+  // Don't restart if one is already active for this user
+  var d=demoInfo();
+  if(d && d.forEmail===(a.email||'') && d.active) return;
+  try{ localStorage.setItem(DEMO_KEY, JSON.stringify({start:Date.now(), duration:DEMO_MINUTES*60000, forEmail:a.email||''})); }catch(e){}
+}
+function endDemo(){
+  try{ localStorage.removeItem(DEMO_KEY); }catch(e){}
+}
+function fmtDemoTime(ms){
+  var s=Math.max(0, Math.floor(ms/1000));
+  return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+}
 var SYNCST='off', SYNCTIMER=null, PULLED=false;
 
 function isSynced(k){ return /^ea3quiz/.test(k) && k!==AUTHK && k!==METAK; }
@@ -1497,13 +1549,24 @@ async function submitApprovalRequest(name, email){
 async function checkApproval(name){
   if(!SUPA.url||!SUPA.key) return {approved:true, missing:true};
   try{
-    var q='/rest/v1/approvals?name=eq.'+encodeURIComponent(String(name||'').trim())+'&select=name,approved';
+    // Ask for the demo flag too — if the column doesn't exist yet the row still comes back and demo is undefined (treated as false)
+    var q='/rest/v1/approvals?name=eq.'+encodeURIComponent(String(name||'').trim())+'&select=name,approved,demo';
     var r=await apiRetry(q,{method:'GET'});
     if(r.status===404 || r.status===401) return {approved:true, missing:true};   // graceful fallback
-    if(!r.ok) return {approved:true, missing:true};
+    if(!r.ok){
+      // Retry without the demo column in case the schema hasn't been migrated
+      try{
+        var q2='/rest/v1/approvals?name=eq.'+encodeURIComponent(String(name||'').trim())+'&select=name,approved';
+        var r2=await apiRetry(q2,{method:'GET'});
+        if(!r2.ok) return {approved:true, missing:true};
+        var rows2=await r2.json();
+        if(!rows2||!rows2.length) return {approved:false, notFound:true};
+        return {approved: !!rows2[0].approved, demo:false};
+      }catch(e2){ return {approved:true, missing:true}; }
+    }
     var rows=await r.json();
     if(!rows || !rows.length) return {approved:false, notFound:true};
-    return {approved: !!rows[0].approved};
+    return {approved: !!rows[0].approved, demo: !!rows[0].demo};
   }catch(e){ return {approved:true, err:String(e.message||e)}; }
 }
 async function listApprovedUsers(){
@@ -1525,9 +1588,29 @@ async function listPendingApprovals(){
   }catch(e){ return {rows:[], err:String(e.message||e)}; }
 }
 async function approveUser(name){
+  // Standard "full-access" approval
   var q='/rest/v1/approvals?name=eq.'+encodeURIComponent(String(name||'').trim());
-  var r=await apiRetry(q,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({approved:true, approved_at:new Date().toISOString()})});
+  var body={approved:true, approved_at:new Date().toISOString(), demo:false};
+  var r=await apiRetry(q,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(body)});
+  if(!r.ok){
+    // If demo column doesn't exist, retry without it
+    try{
+      var r2=await apiRetry(q,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify({approved:true, approved_at:new Date().toISOString()})});
+      return r2.ok;
+    }catch(e){ return false; }
+  }
   return r.ok;
+}
+// Approve with a 15-minute demo cap on the user's account
+async function approveUserAsDemo(name){
+  var q='/rest/v1/approvals?name=eq.'+encodeURIComponent(String(name||'').trim());
+  var body={approved:true, approved_at:new Date().toISOString(), demo:true};
+  var r=await apiRetry(q,{method:'PATCH',headers:{'Prefer':'return=minimal'},body:JSON.stringify(body)});
+  if(!r.ok){
+    // Column doesn't exist — tell caller so admin knows to run the SQL
+    return {ok:false, needsMigration:true};
+  }
+  return {ok:true};
 }
 async function rejectUser(name){
   var q='/rest/v1/approvals?name=eq.'+encodeURIComponent(String(name||'').trim());
@@ -1785,7 +1868,17 @@ async function signInOnly(name,pin){
     var st=await checkApproval(name.trim());
     if(!st.missing && !st.approved){
       signOut();
-      throw new Error(st.notFound?'This account is not registered for approval yet. Please create a login again — the request was not received.':'Your account is waiting for admin approval. You will be able to sign in once Rafay approves you.');
+      throw new Error(st.notFound?'This account is not registered for approval yet. Please create a login again — the request was not received.':'Your account is waiting for admin approval. You will be able to sign in once the admin approves you.');
+    }
+    // Demo-approved accounts start (or resume) a 15-minute session timer
+    if(st.demo){
+      // If a timer for this email already ran out on this device, block sign-in
+      var d=demoInfo();
+      if(d && d.forEmail===((auth()||{}).email||'') && d.expired){
+        signOut();
+        throw new Error('Your 15-minute demo has ended on this device. Ask the admin for full access.');
+      }
+      startDemoForCurrentUser();
     }
   }
   return 'in';
@@ -1877,16 +1970,30 @@ function acctScreen(){
         }
         var html='<div class="mgrouphd"><span>Admin</span><span>'+pend.length+' pending</span></div>';
         pend.forEach(function(p){
-          html+='<div class="mstat" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;margin-bottom:6px">'+
+          html+='<div class="mstat" style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;margin-bottom:6px;flex-wrap:wrap">'+
                 '<span><b>'+esc(p.name)+'</b><br><small style="color:var(--muted)">'+esc(p.email||'')+' \u00b7 '+new Date(p.requested_at).toLocaleString()+'</small></span>'+
-                '<span style="display:flex;gap:6px">'+
-                '<button class="mpill" data-approve="'+esc(p.name)+'" style="background:var(--green-bg);color:var(--green);border-color:var(--green)">Approve</button>'+
+                '<span style="display:flex;gap:6px;flex-wrap:wrap">'+
+                '<button class="mpill" data-approve="'+esc(p.name)+'" style="background:var(--green-bg);color:var(--green);border-color:var(--green)">Approve \u00b7 Full</button>'+
+                '<button class="mpill" data-demo="'+esc(p.name)+'" style="background:rgba(59,130,246,.12);color:var(--blue);border-color:var(--blue)">Approve \u00b7 Demo 15m</button>'+
                 '<button class="mpill" data-reject="'+esc(p.name)+'" style="background:var(--red-bg);color:var(--red);border-color:var(--red)">Reject</button>'+
                 '</span></div>';
         });
         box.innerHTML=html;
         box.querySelectorAll('[data-approve]').forEach(function(b){
           b.onclick=async function(){ b.disabled=true; var ok=await approveUser(b.dataset.approve); if(ok) acctScreen(); else { alert('Approve failed'); b.disabled=false; } };
+        });
+        box.querySelectorAll('[data-demo]').forEach(function(b){
+          b.onclick=async function(){
+            if(!confirm('Approve '+b.dataset.demo+' with a 15-minute demo cap? They will be signed out after 15 minutes and need you to upgrade them for full access.'))return;
+            b.disabled=true;
+            var res=await approveUserAsDemo(b.dataset.demo);
+            if(res && res.ok) acctScreen();
+            else if(res && res.needsMigration){
+              alert('Your Supabase table is missing the "demo" column. Run this ONCE in the Supabase SQL editor, then try again:\n\nALTER TABLE approvals ADD COLUMN IF NOT EXISTS demo boolean DEFAULT false;');
+              b.disabled=false;
+            }
+            else { alert('Demo approval failed'); b.disabled=false; }
+          };
         });
         box.querySelectorAll('[data-reject]').forEach(function(b){
           b.onclick=async function(){ if(!confirm('Reject '+b.dataset.reject+'? Their account request will be removed.'))return; b.disabled=true; var ok=await rejectUser(b.dataset.reject); if(ok) acctScreen(); else { alert('Reject failed'); b.disabled=false; } };
@@ -1924,7 +2031,7 @@ function acctScreen(){
       var r=(_m==='up')?await signUpOnly(n,p):await signInOnly(n,p);
       if(r==='confirm'){ say('Email confirmation is still switched on in Supabase. Turn it off under Authentication → Sign In / Providers → Email, then try again.',1); return; }
       if(r==='pending'){
-        say('Request submitted. Rafay will approve your account. Please try signing in again after approval.',0);
+        say('Request submitted. The admin will approve your account. Please try signing in again after approval.',0);
         return;
       }
       say(r==='new'?'Created. Setting up your account…':'Welcome back. Syncing…');
@@ -2199,8 +2306,8 @@ function showMenu(){
     var xt=XTRA.reduce(function(t,g){return t+g.questions.length;},0);
     var xa=0;
     XTRA.forEach(function(g,i){var s2=xState(i); if(s2)s2.answers.forEach(function(v){if(v!==null&&v!==undefined)xa++;});});
-    html+='<div class="mgrouphd"><span>Extra questions</span><span>outside question bank</span></div><div class="mgrid2">'+
-      '<button class="mwide" id="xtraBtn"><span class="ic">'+micon('sparkle')+'</span><span class="tx"><span class="nm">Extra questions</span>'+
+    html+='<div class="mgrouphd"><span>Becker questions</span><span>outside question bank</span></div><div class="mgrid2">'+
+      '<button class="mwide" id="xtraBtn"><span class="ic">'+micon('sparkle')+'</span><span class="tx"><span class="nm">Becker questions</span>'+
       '<span class="sub">'+XTRA.length+' chapters · '+xt.toLocaleString()+' questions'+(xa?' · '+xa+' answered':'')+'</span></span></button></div>';
   }
 
@@ -2503,12 +2610,12 @@ function extraList(){
   side.classList.remove('active','open');document.body.classList.remove('inquiz');stopTimer();stopClock();
   setFloatBack(goBack,'← Back');
   var tot=XTRA.reduce(function(t,g){return t+g.questions.length;},0);
-  document.getElementById('counter').textContent=PARTS[PART].name+' — Extra Questions';
+  document.getElementById('counter').textContent=PARTS[PART].name+' — Becker Questions';
   document.getElementById('score').textContent='';
   document.getElementById('prog').style.width='0%';
-  var h='<div class="mhead"><div><div class="mtitle">Extra questions</div>'+
-    '<div class="msub">'+XTRA.length+' chapters · '+tot.toLocaleString()+' questions from an outside question bank, grouped by study-guide chapter</div></div></div>'+
-    '<p class="xnote">These questions are not from your study guide — they come from an outside question bank, so they are kept separate from the chapter questions and mocks.</p>';
+  var h='<div class="mhead"><div><div class="mtitle">Becker questions</div>'+
+    '<div class="msub">'+XTRA.length+' chapters · '+tot.toLocaleString()+' questions from the Becker question bank, grouped by study-guide chapter</div></div></div>'+
+    '<p class="xnote">These questions are from the Becker question bank — kept separate from your study-guide chapter questions and mocks.</p>';
   h+='<div class="mgrid2">';
   XTRA.forEach(function(g,i){
     var st2=xState(i),a=0,r=0;
@@ -3478,7 +3585,10 @@ function render(){
     '<button class="flagbtn'+(st.flags[qIdx]?' on':'')+'" id="flagBtn">⚑ '+(st.flags[qIdx]?'Flagged':'Flag')+'</button>'+
     (function(){
       // AI is gated: only the account owner (see ADMINS) gets the button.
-      if (typeof isAdminUser !== 'function' || !isAdminUser()) return '';
+      // Show the inline Ask AI button for admin OR demo users with quota left
+      var _isAdmin = (typeof isAdminUser === 'function' && isAdminUser());
+      var _isDemo  = (typeof isDemoActive === 'function' && isDemoActive() && typeof demoAiRemaining === 'function' && demoAiRemaining() > 0);
+      if (!_isAdmin && !_isDemo) return '';
       var isWrong = (st.answers[qIdx]!==null && st.answers[qIdx]!==Q.a && feedbackOn());
       var label = isWrong ? '💡 Why did I get this wrong?' : '✨ Ask AI';
       var cls = isWrong ? 'flagbtn askai-hot' : 'flagbtn';
@@ -4314,7 +4424,7 @@ function showDashboard(){
   const pct=Math.round(tR/tA*100);
   card.innerHTML='<div class="end"><h2>📊 My Performance</h2>'+
     '<div class="big" style="color:'+(pct>=75?'var(--green)':'var(--red)')+'">'+pct+'%</div>'+
-    '<p><b>'+tR+' of '+tA+'</b> questions answered correctly across all mocks, chapter questions, and extra questions. The exam pass line is roughly 75% — anything below that in a section needs restudy. Weakest areas are listed first.</p>'+
+    '<p><b>'+tR+' of '+tA+'</b> questions answered correctly across all mocks, chapter questions, and Becker questions. The exam pass line is roughly 75% — anything below that in a section needs restudy. Weakest areas are listed first.</p>'+
     '<h4 style="margin-top:16px">By Study Unit</h4><table><tr><th>Study Unit</th><th>Score</th><th style="min-width:90px">Bar</th></tr>'+mk(uRows)+'</table>'+
     (tRows.length?'<h4 style="margin-top:16px">Weakest Topics <span style="font-weight:400;color:var(--muted)">(2+ questions answered)</span></h4><table><tr><th>Topic</th><th>Score</th><th style="min-width:90px">Bar</th></tr>'+mk(tRows)+'</table>':'')+
     '<p style="color:var(--muted);font-size:13px;margin-top:12px">Tip: use 🔁 Smart Review on the menu to drill the exact questions behind these numbers.</p>'+
@@ -4686,7 +4796,57 @@ async function __boot(){
   var a=auth(); if(a){ setSync('sync'); syncNow('quiet'); }
   restoreView();
   var ab=document.getElementById('acctBtn'); if(ab)ab.onclick=acctScreen;
+  // Kick off the demo watcher (banner + auto-expire)
+  setInterval(_demoTick, 1000);
+  _demoTick();
 }
+
+// ---- Demo-mode UI: banner shows remaining time; on expiration, block use and sign out ----
+function _demoTick(){
+  try{
+    var d=demoInfo();
+    var bar=document.getElementById('demoBanner');
+    var block=document.getElementById('demoBlock');
+    var showBanner = d && d.forEmail && auth() && auth().email===d.forEmail && d.active;
+    var showBlock  = d && d.forEmail && auth() && auth().email===d.forEmail && d.expired;
+    if(showBanner){
+      if(!bar){
+        bar=document.createElement('div');
+        bar.id='demoBanner';
+        bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:9998;background:rgba(59,130,246,.95);color:#fff;padding:8px 14px;font-size:13.5px;font-weight:600;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.15);';
+        document.body.appendChild(bar);
+        document.body.style.paddingTop='36px';
+      }
+      var aiLeft = (typeof demoAiRemaining === 'function') ? demoAiRemaining() : 0;
+      var aiPart = ' · '+aiLeft+' / '+DEMO_AI_LIMIT+' AI questions left';
+      bar.textContent='Demo access — '+fmtDemoTime(d.remaining)+' remaining'+aiPart+'. Ask the admin for full access to keep going.';
+    } else if(bar){
+      bar.remove(); document.body.style.paddingTop='';
+    }
+    if(showBlock){
+      if(!block){
+        block=document.createElement('div');
+        block.id='demoBlock';
+        block.style.cssText='position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:24px;';
+        block.innerHTML='<div style="background:var(--card);color:var(--ink);border:1px solid var(--border);border-radius:14px;padding:28px;max-width:420px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.4)">'+
+          '<div style="font-size:44px;margin-bottom:12px">⏳</div>'+
+          '<h2 style="margin:0 0 10px;font-size:20px">Your 15-minute demo has ended</h2>'+
+          '<p style="margin:0 0 18px;color:var(--muted);font-size:14.5px;line-height:1.5">Thanks for trying the app. To continue studying, ask the admin to upgrade you to full access.</p>'+
+          '<button id="demoSignout" class="opt" style="margin:0">Sign out</button>'+
+          '</div>';
+        document.body.appendChild(block);
+        document.getElementById('demoSignout').onclick=function(){
+          try{ signOut(); }catch(e){}
+          endDemo();
+          location.reload();
+        };
+      }
+    } else if(block){
+      block.remove();
+    }
+  }catch(e){}
+}
+
 __boot();
 </script>
 <!-- AI Tutor Widget -->
@@ -4712,15 +4872,14 @@ __boot();
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
     color:var(--ink);
   }
-  /* When the AI panel is open on desktop, shift the quiz content left so it isn't hidden */
+  /* When the AI panel is open on desktop, reserve room on the right so the quiz
+     content stays CENTERED in the remaining space (not shoved to the left edge). */
   @media (min-width: 1024px){
-    body.ai-open .wrap{
-      margin-left:24px;
-      margin-right:calc(var(--ai-panel-w) + var(--ai-panel-gap) + 16px);
-      max-width:none;
+    body.ai-open{
+      padding-right:calc(var(--ai-panel-w) + var(--ai-panel-gap) + 16px);
     }
   }
-  .wrap{ transition: margin .18s ease, max-width .18s ease; }
+  body{ transition: padding .18s ease; }
   #ai-tutor-header{
     background:var(--card);color:var(--ink);
     padding:14px 18px;display:flex;justify-content:space-between;align-items:center;
@@ -4889,7 +5048,12 @@ __boot();
   // This hides the floating button entirely for other users. NOTE: for full protection the worker
   // itself would need an auth check; this is client-side gating for casual restriction.
   function _aiAllowed(){
-    try { return typeof isAdminUser === 'function' && isAdminUser(); } catch(e) { return false; }
+    try {
+      if (typeof isAdminUser === 'function' && isAdminUser()) return true;
+      // Demo users get a small AI quota (see DEMO_AI_LIMIT)
+      if (typeof isDemoActive === 'function' && isDemoActive() && typeof demoAiRemaining === 'function' && demoAiRemaining() > 0) return true;
+      return false;
+    } catch(e) { return false; }
   }
   function _refreshAiVisibility(){
     if (!_aiAllowed()) {
@@ -5531,10 +5695,22 @@ __boot();
     if (!_aiAllowed()) {
       const gate = document.createElement('div');
       gate.className = 'ai-msg bot';
-      gate.innerHTML = '<strong>AI Tutor is disabled on this account.</strong><br>Only the account owner can use the AI tutor. Ask Rafay if you need access.';
+      // Distinguish "demo quota exhausted" from "not allowed at all"
+      var isDemo = (typeof isDemoActive === 'function' && isDemoActive());
+      if (isDemo && typeof demoAiRemaining === 'function' && demoAiRemaining() === 0) {
+        gate.innerHTML = '<strong>You\'ve used all '+DEMO_AI_LIMIT+' demo AI questions.</strong><br>Ask the admin to upgrade you to full access for unlimited use.';
+      } else {
+        gate.innerHTML = '<strong>AI Tutor is disabled on this account.</strong><br>Only the account owner can use the AI tutor. Ask the admin if you need access.';
+      }
       messages.appendChild(gate);
       input.value = '';
       return;
+    }
+
+    // Demo users: count this against their small AI quota BEFORE we send
+    var _isDemoCaller = (typeof isDemoActive === 'function' && isDemoActive() && (typeof isAdminUser !== 'function' || !isAdminUser()));
+    if (_isDemoCaller) {
+      try { bumpDemoAi(); } catch(e) {}
     }
 
     addMsg(q, true);
