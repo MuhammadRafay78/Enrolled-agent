@@ -1434,7 +1434,25 @@ function fmtDemoTime(ms){
 }
 var SYNCST='off', SYNCTIMER=null, PULLED=false;
 
-function isSynced(k){ return /^ea3quiz/.test(k) && k!==AUTHK && k!==METAK; }
+function isSynced(k){
+  if(!/^ea3quiz/.test(k)) return false;
+  if(k===AUTHK||k===METAK) return false;
+  // Device-local: these can grow large or are per-device by nature. Excluding them from
+  // sync keeps the payload under Supabase's request-size limit. Question/flag progress
+  // (mock, mcq, extra, gleim, chapter) is unaffected and still syncs.
+  var DEVICE_LOCAL = {
+    'ea3quiz_demo': 1,                    // demo session timer, per-device
+    'ea3quiz_v2_ai_chats': 1,             // per-question chat history — can be 100s of KB
+    'ea3quiz_v2_ai_resp_cache': 1,        // AI response cache — can be 100s of KB
+    'ea3quiz_v2_tough_ai_cache': 1,       // Toughest-for-me ranking cache
+    'ea3quiz_v2_tutorSize': 1,            // AI panel width preference
+    'ea3quiz_v2_ai_migration_v1': 1,      // one-time boot marker
+    'ea_theme_local': 1,                  // theme preference is already local-only by name
+    'ea3quiz_sec': 1                      // collapsed-section state
+  };
+  if(DEVICE_LOCAL[k]) return false;
+  return true;
+}
 function auth(){ try{return JSON.parse(localStorage.getItem(AUTHK))||null;}catch(e){return null;} }
 function authGate(){ return !!(SUPA.url&&SUPA.key&&!auth()); }
 function setAuth(a){ try{ a?localStorage.setItem(AUTHK,JSON.stringify(a)):localStorage.removeItem(AUTHK); }catch(e){} }
@@ -1770,10 +1788,28 @@ async function syncNow(force){
     });
     try{localStorage.setItem(METAK,JSON.stringify(m));}catch(e){}
     if(push.length){
+      var pushBody=push.map(function(x){return {k:x.k,v:x.v,t:x.t};});
       var pr=await apiRetry('/rest/v1/progress',{method:'POST',
         headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
-        body:JSON.stringify(push.map(function(x){return {k:x.k,v:x.v,t:x.t};}))});
-      if(!pr.ok) throw new Error('write failed ('+pr.status+')');
+        body:JSON.stringify(pushBody)});
+      // If the batched push fails (usually payload too big), fall back to per-key pushes
+      // so ONE bad row doesn't kill the whole sync. Skip rows > 500KB entirely — they
+      // won't ever succeed and are usually stale cache values that snuck through.
+      if(!pr.ok){
+        var anyOk=false, skipped=[];
+        for(var _i=0;_i<pushBody.length;_i++){
+          var _row=pushBody[_i];
+          if((_row.v||'').length > 500000){ skipped.push(_row.k); continue; }
+          try{
+            var _prOne=await apiRetry('/rest/v1/progress',{method:'POST',
+              headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
+              body:JSON.stringify([_row])});
+            if(_prOne.ok) anyOk=true;
+          }catch(e){}
+        }
+        if(skipped.length){ try{console.warn('Sync skipped oversized keys:',skipped);}catch(_){ } }
+        if(!anyOk && push.length) throw new Error('write failed ('+pr.status+')');
+      }
     }
     PULLED=true; if(!_quiet) setSync('ok');
     try{ kickIfNotOwner(); }catch(e){}
