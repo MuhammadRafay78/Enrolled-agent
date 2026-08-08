@@ -3622,8 +3622,9 @@ function notesUnitList(){
   document.getElementById('counter').textContent=PARTS[PART].name+' — Chapter Notes';
   document.getElementById('score').textContent='';
   document.getElementById('prog').style.width='0%';
-  if(!C){card.innerHTML='<div class="end"><h2>📘 Chapter Notes</h2><p style="margin:14px 0">No study-guide notes are loaded for this part yet.</p><button class="restart" id="menu">Exam Menu</button></div>';document.getElementById('menu').onclick=showMenu;return;}
+  if(!C){card.innerHTML='<div class="end"><h2>📘 Chapter Notes</h2><p style="margin:14px 0">No study-guide notes are loaded for this part yet.</p>'+bookDownloadHtml()+'<button class="restart" id="menu">Exam Menu</button></div>';document.getElementById('menu').onclick=showMenu;return;}
   var h='<h2 style="margin-bottom:6px">📘 Chapter Notes <span style="font-weight:400;color:var(--muted);font-size:14px">— '+PARTS[PART].name+'</span></h2><p style="color:var(--muted);font-size:14px;margin-bottom:14px">Your complete study guide, chapter by chapter — forms, thresholds, rules and worked examples.</p>';
+  h+=bookDownloadHtml();
   Object.keys(C).sort(function(a,b){return a-b;}).forEach(function(n){
     var u=C[n];
     var nq=(BOOKQ[PART]&&BOOKQ[PART][n])?BOOKQ[PART][n].length:0;
@@ -3639,6 +3640,16 @@ function notesUnitList(){
 // ==== NOTES LIBRARY (list of chapters)
 // ============================================================================
 // ---------- study notes library ----------
+// Full study-guide PDFs, offered as a download alongside (or instead of) the
+// interactive notes library. Keyed by Part — only parts with a book shipped show the link.
+var BOOK_PDFS={
+  1:{file:'books/EA-Part1-Individuals-Study-Guide.pdf', label:'EA Part 1 — Individuals Study Guide'},
+  2:{file:'books/EA-Part2-Businesses-Study-Guide.pdf', label:'EA Part 2 — Businesses Study Guide'}
+};
+function bookDownloadHtml(){
+  var b=BOOK_PDFS[PART]; if(!b)return '';
+  return '<a class="dlbook" href="'+b.file+'" download>📥 Download the full book (PDF) — <span>'+b.label+'</span></a>';
+}
 function showLibrary(openUnit){
   side.classList.remove('active','open');document.body.classList.remove('inquiz');stopTimer();stopClock();
   var R=REFRESH[PART];
@@ -3647,6 +3658,7 @@ function showLibrary(openUnit){
   document.getElementById('prog').style.width='0%';
   if(!R){card.innerHTML='<div class="end"><h2>📖 Study Notes</h2><p style="margin:14px 0">No study notes are loaded for this part yet.</p><button class="restart" id="menu">Exam Menu</button></div>';document.getElementById('menu').onclick=showMenu;return;}
   var h='<h2 style="margin-bottom:6px">📖 Study Notes Library</h2><p style="color:var(--muted);font-size:14px;margin-bottom:14px">Condensed rules from your study guide. Click a unit to expand its sections.</p>';
+  h+=bookDownloadHtml();
   h+='<input class="searchbox" id="libSearch" placeholder="🔍 Search the notes…"><div id="libRes"></div>';
   Object.keys(R.units).sort(function(a,b){return a-b;}).forEach(function(n){
     var u=R.units[n], open=(String(openUnit)===String(n));
