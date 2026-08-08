@@ -227,19 +227,26 @@
   .swmore{border-left:none;border-radius:0 16px 16px 0;padding:5px 8px;color:var(--muted);font-size:11px;}
   .swbtn:hover{border-color:var(--blue);color:var(--blue);}
   .swbtn.running{border-color:var(--green);color:var(--green);background:var(--green-bg);}
+  .swbtn.paused{border-color:#d97706;color:#d97706;background:#fff7ed;}
+  body.is-dark .swbtn.paused{background:#3a2c10;}
   .swdot{width:7px;height:7px;border-radius:50%;background:var(--green);flex-shrink:0;animation:swpulse 1.6s ease-in-out infinite;}
+  .swdot.paused{background:#d97706;animation:none;}
   @keyframes swpulse{0%,100%{opacity:1;}50%{opacity:.25;}}
   .swtime{font-variant-numeric:tabular-nums;}
+  .swqcount{font-variant-numeric:tabular-nums;opacity:.8;margin-left:1px;}
   .swpanel{position:absolute;right:0;top:calc(100% + 7px);z-index:70;width:250px;background:var(--card);border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 26px rgba(0,0,0,.20);padding:13px;display:none;text-align:left;}
   .swpanel.open{display:block;}
   .swpanel h4{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 9px;font-weight:700;}
   .swbig{font-size:25px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;}
   .swsub{font-size:11.5px;color:var(--muted);margin:1px 0 11px;}
   .swgo{width:100%;border:none;border-radius:9px;padding:10px;font-size:13.5px;font-weight:700;cursor:pointer;font-family:inherit;background:var(--green);color:#fff;}
-  .swgo.stop{background:var(--red);}
+  .swgo.pause{background:#d97706;}
   .swgo:hover{filter:brightness(1.08);}
+  .swend{width:100%;border:1px solid var(--border);background:transparent;color:var(--red);border-radius:9px;padding:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:6px;}
+  .swend:hover{background:var(--red-bg);border-color:var(--red);}
   .swtbl{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:4px;}
   .swcap{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-top:12px;font-weight:700;}
+  .swsess{font-size:12.5px;font-weight:600;color:var(--ink);margin-top:3px;}
   .swtbl td{padding:5px 0;border-bottom:1px solid var(--border);}
   .swtbl td:last-child{text-align:right;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
   .swtbl tr.cur td{color:var(--blue);}
@@ -1215,28 +1222,93 @@ function swDay(s,k){ return (s.days&&s.days[k])||0; }
 function swTotal(s){ var t=0,d=s.days||{}; for(var k in d)t+=d[k]; return t; }
 function swPartTotal(s,p){ return s.tot[p]||0; }
 // A clock left running when the browser closed: everything up to the last tick is
-// already banked, so just stop it.
+// already banked. Treat that like an auto-pause (not an end) so the session — and
+// its question count — survives being reopened later; only an explicit "End
+// session" click should reset the count to zero.
 function swRecover(){
   var s=swGet();
-  if(s.run&&s.run.seen&&Date.now()-s.run.seen>180000){ s.run=null; swSave(s); }
+  if(s.run&&s.run.seen&&Date.now()-s.run.seen>180000){
+    var legSec=Math.max(0,(s.run.seen-s.run.t)/1000);
+    var legQ=Math.max(0,totalAnsweredAllTime()-(s.run.q0||0));
+    if(s.session){s.session.accSec=(s.session.accSec||0)+legSec; s.session.qBank=(s.session.qBank||0)+legQ; s.session.p=s.run.p;}
+    s.run=null; swSave(s);
+  }
   return s;
 }
+// Live elapsed seconds for the current session: banked prior legs + the leg in progress.
+function swSessionElapsed(s){
+  var acc=(s.session&&s.session.accSec)||0;
+  return acc+(s.run?Math.max(0,(Date.now()-s.run.t)/1000):0);
+}
+// Questions answered so far this session: banked prior legs + the leg in progress.
+// Banking per-leg (like time) means answers from OTHER activity while paused don't
+// silently bleed into a session that isn't actively running.
+function swSessionQCount(s){
+  if(!s.session)return 0;
+  var banked=s.session.qBank||0;
+  var live=s.run?Math.max(0,totalAnsweredAllTime()-(s.run.q0||0)):0;
+  return banked+live;
+}
+// Formats an average pace like "48s/question" or "2m 10s/question".
+function fmtPace(sec,q){
+  if(!q)return '';
+  var avg=sec/q;
+  return (avg<60?Math.round(avg)+'s':fmtDur(avg))+'/question';
+}
+// Start: begin a brand-new session (question count resets to 0) and start the clock.
 function swStart(){
   var s=swGet();
-  if(s.run)return;
+  if(s.session)return;
   var now=Date.now();
-  s.run={p:PART,t:now,last:now,seen:now};
+  s.session={accSec:0,qBank:0,startedAt:now,p:PART};
+  s.run={p:PART,t:now,last:now,seen:now,q0:totalAnsweredAllTime()};
   swSave(s); swRender(); swPanelRender(); swTick();
 }
-function swStop(){
+// Pause: stop the clock but keep the session (and its banked question count) alive.
+function swPause(){
   var s=swGet();
   if(!s.run)return;
+  var legSec=Math.max(0,(Date.now()-s.run.t)/1000);
+  var legQ=Math.max(0,totalAnsweredAllTime()-(s.run.q0||0));
   swAccrue(s,Date.now());
+  if(s.session){s.session.accSec=(s.session.accSec||0)+legSec; s.session.qBank=(s.session.qBank||0)+legQ; s.session.p=s.run.p;}
   s.run=null; swSave(s);
   if(SWINT){clearInterval(SWINT);SWINT=null;}
   swRender(); swPanelRender();
 }
-function swToggle(){ swGet().run?swStop():swStart(); }
+// Resume: continue the current session's clock and question count from where it paused.
+function swResume(){
+  var s=swGet();
+  if(s.run||!s.session)return;
+  var now=Date.now();
+  s.run={p:PART,t:now,last:now,seen:now,q0:totalAnsweredAllTime()};
+  s.session.p=PART;
+  swSave(s); swRender(); swPanelRender(); swTick();
+}
+// Stop/End session: finalize into "Last session" and reset the question count to 0.
+function swStop(){
+  var s=swGet();
+  if(!s.session&&!s.run)return;
+  var legSec=0, legQ=0;
+  if(s.run){
+    legSec=Math.max(0,(Date.now()-s.run.t)/1000);
+    legQ=Math.max(0,totalAnsweredAllTime()-(s.run.q0||0));
+    swAccrue(s,Date.now());
+  }
+  var accSec=((s.session&&s.session.accSec)||0)+legSec;
+  var qTotal=((s.session&&s.session.qBank)||0)+legQ;
+  s.lastSession={q:qTotal,sec:Math.round(accSec),endedAt:Date.now()};
+  s.run=null; s.session=null; swSave(s);
+  if(SWINT){clearInterval(SWINT);SWINT=null;}
+  swRender(); swPanelRender();
+}
+// Header chip: no session → start; running → pause; paused → resume.
+function swToggle(){
+  var s=swGet();
+  if(!s.session)swStart();
+  else if(s.run)swPause();
+  else swResume();
+}
 function swTick(){
   if(SWINT)clearInterval(SWINT);
   SWINT=setInterval(function(){
@@ -1250,21 +1322,40 @@ function swTick(){
 }
 function swRender(){
   var b=document.getElementById('swBtn'); if(!b)return;
-  var s=swGetAll(), run=!!swGet().run, today=swDay(s,dayKey());
-  b.className='swbtn'+(run?' running':'');
-  b.innerHTML=(run?'<span class="swdot"></span>':'⏱ ')+
-    '<span class="swtime">'+(run?hhmmss(today):(today>0?fmtDur(today):'Start'))+'</span>';
-  b.title=run?'Timing now — click to stop. Shows today’s total.'
-             :'Today’s study time — click to start the timer.';
+  var s=swGetAll(), dev=swGet(), running=!!dev.run, paused=!!dev.session&&!dev.run, today=swDay(s,dayKey());
+  var q=dev.session?swSessionQCount(dev):0;
+  b.className='swbtn'+(running?' running':(paused?' paused':''));
+  b.innerHTML=(running?'<span class="swdot"></span>':(paused?'<span class="swdot paused"></span>':'⏱ '))+
+    '<span class="swtime">'+(running||paused?hhmmss(today):(today>0?fmtDur(today):'Start'))+'</span>'+
+    (dev.session?'<span class="swqcount">· '+q+' q'+(paused?' · paused':'')+'</span>':'');
+  b.title=running?('Timing now — '+q+' question'+(q===1?'':'s')+' this session. Click to pause.')
+        :paused?('Paused — '+q+' question'+(q===1?'':'s')+' so far. Click to resume.')
+        :'Today’s study time — click to start the timer.';
 }
 function swPanelRender(){
   var el=document.getElementById('swPanel'); if(!el)return;
-  var s=swGetAll(), run=!!swGet().run;
+  var s=swGetAll(), dev=swGet(), run=!!dev.run, paused=!!dev.session&&!dev.run;
   var today=swDay(s,dayKey()), yday=swDay(s,yesterdayKey()), all=swTotal(s);
+  var curPart=run?dev.run.p:(paused?dev.session.p:null);
+  var sessH='';
+  if(dev.session){
+    var qNow=swSessionQCount(dev), secNow=swSessionElapsed(dev);
+    sessH='<div class="swcap">This session'+(paused?' (paused)':'')+'</div>'+
+      '<div class="swsess">'+qNow+' question'+(qNow===1?'':'s')+' · '+hhmmss(secNow)+
+      (qNow?' · '+fmtPace(secNow,qNow):'')+'</div>';
+  }else if(dev.lastSession&&(dev.lastSession.q||dev.lastSession.sec)){
+    var ls=dev.lastSession;
+    sessH='<div class="swcap">Last session</div>'+
+      '<div class="swsess">'+ls.q+' question'+(ls.q===1?'':'s')+' in '+hhmmss(ls.sec)+
+      (ls.q?' · '+fmtPace(ls.sec,ls.q):'')+'</div>';
+  }
+  var goLabel=run?'⏸ Pause the time':(paused?'▶ Resume the time':'▶ Start the time');
   var h='<h4>Study timer</h4>'+
     '<div class="swbig">'+hhmmss(today)+'</div>'+
-    '<div class="swsub">today'+(run?' · running · '+(PARTS[s.run.p]?PARTS[s.run.p].name:'Part '+s.run.p):'')+'</div>'+
-    '<button class="swgo'+(run?' stop':'')+'" id="swGo">'+(run?'■ Stop the time':'▶ Start the time')+'</button>'+
+    '<div class="swsub">today'+(curPart!=null?(run?' · running · ':' · paused · ')+(PARTS[curPart]?PARTS[curPart].name:'Part '+curPart):'')+'</div>'+
+    '<button class="swgo'+(run?' pause':'')+'" id="swGo">'+goLabel+'</button>'+
+    (dev.session?'<button class="swend" id="swEnd">■ End session</button>':'')+
+    sessH+
     '<div class="swcap">By day</div>'+
     '<table class="swtbl">'+
       '<tr class="cur"><td>Today</td><td>'+fmtDur(today)+'</td></tr>'+
@@ -1273,12 +1364,14 @@ function swPanelRender(){
     '</table>'+
     '<div class="swcap">By part</div>'+
     '<table class="swtbl">'+[1,2,3].map(function(p){
-      var cur=run?String(s.run.p)===String(p):String(PART)===String(p);
+      var cur=curPart!=null?String(curPart)===String(p):String(PART)===String(p);
       return '<tr'+(cur?' class="cur"':'')+'><td>'+(PARTS[p]?PARTS[p].name:'Part '+p)+'</td><td>'+fmtDur(swPartTotal(s,p))+'</td></tr>';
     }).join('')+'</table>'+
-    '<div class="swfoot"><span style="color:var(--muted)">Counts only while the timer is running</span></div>';
+    '<div class="swfoot"><span style="color:var(--muted)">Pausing keeps this session\'s question count · ending resets it</span></div>';
   el.innerHTML=h;
   document.getElementById('swGo').onclick=function(){swToggle();};
+  var endBtn=document.getElementById('swEnd');
+  if(endBtn)endBtn.onclick=function(e){e.stopPropagation();swStop();};
 }
 function initStopwatch(){
   var s=swRecover();
@@ -1342,6 +1435,9 @@ function recordAnswerToday(){
   try{localStorage.setItem(DAILY_KEY,JSON.stringify(log));}catch(e){}
 }
 function todayCount(){ return dailyLog()[estDate()]||0; }
+// Lifetime count of answers logged, used to measure how many questions were
+// attempted during a given Start/Stop timer session (session count = delta of this).
+function totalAnsweredAllTime(){ var log=dailyLog(),t=0; for(var k in log)t+=(log[k]||0); return t; }
 function currentStreak(){
   var log=dailyLog(); var streak=0;
   var d=new Date();
