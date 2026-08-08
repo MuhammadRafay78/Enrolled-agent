@@ -937,7 +937,8 @@
     concept: 'Explain the core tax concept behind this question in plain language. What is the underlying rule I need to understand?',
     wrong:   'Look at the answer I chose. Explain why my pick is wrong (or if I got it right, why the trap answers are wrong), and how to spot this on the exam.',
     mnemonic:'Give me a memory device (mnemonic, mental shortcut, or one-line rule) to remember the answer to this question for the EA exam.',
-    similar: 'Write ONE similar-difficulty EA-exam practice question that tests the same rule, with four options and the correct answer marked at the end. Do not repeat this exact question.'
+    similar: 'Write ONE similar-difficulty EA-exam practice question that tests the same rule, with four options and the correct answer marked at the end. Do not repeat this exact question.',
+    summary: 'Summarize the entire chapter this question belongs to — not just this one question. Give me the most important rules, numbers, thresholds, and exam traps I need to know, organized by section if that helps. Keep it exam-focused.'
   };
   document.querySelectorAll('#ai-tutor-quicks [data-qp]').forEach(b => {
     b.onclick = () => {
