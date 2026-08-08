@@ -2861,7 +2861,7 @@ function renderSide(){
     '<button class="side-btn" id="sbResults">'+(st.mode==='exam'&&!st.examDone?'Submit Exam':'Results')+'</button>'+
     (st.flags.some(Boolean)?'<button class="side-btn" id="sbFlag">Next flagged ⚑</button>':'')+
     (st.review?'':'<button class="side-btn" id="sbReset">Reset progress</button>')+
-    '<button class="side-btn" id="sbMenu">← Exam menu</button>';
+    '<button class="side-btn" id="sbMenu">← Go back</button>';
   side.querySelectorAll('[data-j]').forEach(function(b){b.onclick=function(){pos=+b.dataset.j;side.classList.remove('open');renderSide();render();scrollTop();};});
   document.getElementById('sideClose').onclick=function(){side.classList.remove('open');};
   var sbn=document.getElementById('sbNotes');
@@ -2880,7 +2880,14 @@ function renderSide(){
   };
   const rbtn=document.getElementById('sbReset');
   if(rbtn)rbtn.onclick=function(){exam===-3?resetChapter():(exam===-4?resetMcqNow():resetExam(exam));};
-  document.getElementById('sbMenu').onclick=showMenu;
+  document.getElementById('sbMenu').onclick=function(){
+    // Return to whichever list screen this quiz was actually launched from,
+    // not always the top-level exam menu — so picking another chapter/set is one click.
+    if(exam===-4)mcqChapterList();
+    else if(exam===-5)extraList();
+    else if(exam===-11)gleimList();
+    else showMenu();
+  };
 }
 // Format an explanation string so the correct-answer reasoning and the
 // 'Why the others are wrong:' bullets render as separate paragraphs and lines.

@@ -103,18 +103,26 @@
   #ai-tutor-list-back:hover{background:var(--bg);}
   .ai-list-empty{color:var(--muted);font-size:13.5px;line-height:1.6;padding:8px 2px;}
   .ai-list-item{
-    border:1px solid var(--border);border-radius:10px;padding:12px 14px;background:var(--bg);
+    border:1px solid var(--border);border-radius:10px;background:var(--bg);overflow:hidden;
   }
-  .ai-list-item-top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
-  .ai-list-item-top strong{font-size:14px;color:var(--ink);line-height:1.35;}
+  .ai-list-item-top{display:flex;align-items:flex-start;gap:8px;padding:12px 14px;cursor:pointer;}
+  .ai-list-item-top:hover{background:var(--card);}
+  .ai-list-item-head{flex:1;min-width:0;}
+  .ai-list-item-head strong{font-size:14px;color:var(--ink);line-height:1.35;display:block;}
+  .ai-list-item-unit{font-size:11.5px;color:var(--muted);display:block;margin-top:2px;}
+  .ai-list-chev{flex-shrink:0;color:var(--muted);font-size:12px;margin-top:2px;}
   .ai-list-remove{
     flex-shrink:0;background:var(--card);border:1px solid var(--border);border-radius:50%;
     width:26px;height:26px;font-size:13px;color:var(--muted);cursor:pointer;
     display:flex;align-items:center;justify-content:center;font-family:inherit;
   }
   .ai-list-remove:hover{border-color:#16a34a;color:#16a34a;}
-  .ai-list-item-unit{font-size:11.5px;color:var(--muted);margin-top:2px;}
-  .ai-list-item-note{font-size:13px;color:var(--ink);margin-top:8px;line-height:1.5;opacity:.85;}
+  .ai-list-item-body{padding:0 14px 14px;}
+  .ai-list-ref{border-left:3px solid var(--blue);padding:6px 0 6px 10px;margin-bottom:8px;}
+  .ai-list-ref-src{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.02em;margin-bottom:3px;}
+  .ai-list-ref-text{font-size:13px;color:var(--ink);line-height:1.55;}
+  .ai-list-ref-none{font-size:12.5px;color:var(--muted);font-style:italic;margin-bottom:8px;}
+  .ai-list-item-note{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5;}
   .ai-list-item-date{font-size:11px;color:var(--muted);margin-top:8px;}
   #ai-tutor-quicks{
     display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 0;background:var(--card);

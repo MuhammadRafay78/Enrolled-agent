@@ -74,10 +74,20 @@
   if (listBackBtn) listBackBtn.onclick = (e) => { e.stopPropagation(); _showStudyList(false); };
   const listItemsEl = document.getElementById('ai-tutor-list-items');
   if (listItemsEl) listItemsEl.addEventListener('click', (e) => {
-    const btn2 = e.target.closest('.ai-list-remove');
-    if (!btn2) return;
-    const card = btn2.closest('.ai-list-item');
-    if (card) removeFromStudyList(card.dataset.id);
+    const removeBtn = e.target.closest('.ai-list-remove');
+    if (removeBtn) {
+      const card = removeBtn.closest('.ai-list-item');
+      if (card) removeFromStudyList(card.dataset.id);
+      return;
+    }
+    const head = e.target.closest('.ai-list-item-top');
+    if (head) {
+      const card = head.closest('.ai-list-item');
+      const id = card && card.dataset.id;
+      if (!id) return;
+      if (_expandedListIds.has(id)) _expandedListIds.delete(id); else _expandedListIds.add(id);
+      renderStudyListView();
+    }
   });
   window.addEventListener('resize', () => {
     // Re-evaluate reflow when window crosses the 1024px threshold
@@ -182,11 +192,28 @@
     const qhash = q ? _questionHash(q) : '';
     // Don't duplicate the same question — bump it to the top instead.
     const existingIdx = qhash ? list.findIndex(x => x.qhash === qhash) : -1;
+    // Ground this in the actual book text — no AI call, pure keyword match against
+    // CHNOTES, so what gets saved is verbatim from the source guide. Search the
+    // user's own note FIRST and ONLY: that's what names the specific concept (e.g.
+    // "NIIT threshold"), and it's often a *different* section than the question
+    // currently on screen. Blending in the question's own topic/text here would
+    // just bias every result back toward the current section regardless of what
+    // the student actually asked to save — only fall back to that if the note
+    // alone (e.g. a bare "add this to my list") doesn't match anything.
+    // 5, not 3 — a note naming two distinct concepts (e.g. "Medicare tax AND NIIT
+    // thresholds") needs room for a good match on each, not just the single best.
+    let refs = _ragSearchByText(note || '', 5);
+    if (!refs.length) {
+      const fallbackQuery = [note, q && q.topic, q && q.q].filter(Boolean).join(' ');
+      refs = _ragSearchByText(fallbackQuery, 5);
+    }
     const entry = {
       id: existingIdx >= 0 ? list[existingIdx].id : (Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
       topic: (q && q.topic) || 'General',
       unit: (q && q.unit) || '',
+      part: (typeof PART !== 'undefined') ? PART : null,
       note: (note || '').trim(),
+      refs: refs, // verbatim book excerpts — see _ragSearchByText
       qhash: qhash,
       addedAt: Date.now()
     };
@@ -210,6 +237,8 @@
     badge.style.display = n > 0 ? 'inline-flex' : 'none';
   }
   function _esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  // Which cards are expanded — in-memory only, resets when the panel is reopened.
+  const _expandedListIds = new Set();
   function renderStudyListView(){
     const el = document.getElementById('ai-tutor-list-items');
     if (!el) return;
@@ -221,13 +250,29 @@
     el.innerHTML = list.map(function(e){
       const d = new Date(e.addedAt);
       const dateStr = isNaN(d) ? '' : d.toLocaleDateString(undefined, {month:'short', day:'numeric'});
-      return '<div class="ai-list-item" data-id="' + _esc(e.id) + '">' +
-        '<div class="ai-list-item-top"><strong>' + _esc(e.topic) + '</strong>' +
-          '<button type="button" class="ai-list-remove" title="Mark as mastered / remove">✓</button></div>' +
-        (e.unit ? '<div class="ai-list-item-unit">' + _esc(e.unit) + '</div>' : '') +
-        (e.note ? '<div class="ai-list-item-note">' + _esc(e.note) + '</div>' : '') +
-        (dateStr ? '<div class="ai-list-item-date">Added ' + dateStr + '</div>' : '') +
-        '</div>';
+      const open = _expandedListIds.has(e.id);
+      const refs = Array.isArray(e.refs) ? e.refs : [];
+      const refsHtml = refs.length
+        ? refs.map(function(r){
+            return '<div class="ai-list-ref">' +
+              '<div class="ai-list-ref-src">Ch ' + _esc(r.chNum) + ' — ' + _esc(r.chTitle) + ' § ' + _esc(r.sec) + '</div>' +
+              '<div class="ai-list-ref-text">' + _esc(r.snippet) + '</div>' +
+            '</div>';
+          }).join('')
+        : '<div class="ai-list-ref-none">No exact passage matched in the book for this — your note is kept below as a reminder of what to look up.</div>';
+      return '<div class="ai-list-item' + (open ? ' open' : '') + '" data-id="' + _esc(e.id) + '">' +
+        '<div class="ai-list-item-top">' +
+          '<div class="ai-list-item-head"><strong>' + _esc(e.topic) + '</strong>' +
+            (e.unit ? '<span class="ai-list-item-unit">' + _esc(e.unit) + '</span>' : '') + '</div>' +
+          '<span class="ai-list-chev">' + (open ? '▾' : '▸') + '</span>' +
+          '<button type="button" class="ai-list-remove" title="Mark as mastered / remove">✓</button>' +
+        '</div>' +
+        '<div class="ai-list-item-body" style="display:' + (open ? 'block' : 'none') + '">' +
+          refsHtml +
+          (e.note ? '<div class="ai-list-item-note">Your note: ' + _esc(e.note) + '</div>' : '') +
+          (dateStr ? '<div class="ai-list-item-date">Added ' + dateStr + '</div>' : '') +
+        '</div>' +
+      '</div>';
     }).join('');
   }
 
@@ -525,37 +570,81 @@
     }
     return out;
   }
+  // Indexes every section of a Part's study-guide notes once (word sets + how many
+  // sections each word appears in), cached per Part number for the session.
+  const _sectionIndexCache = {};
+  function _getSectionIndex(){
+    if (typeof CHNOTES === 'undefined' || !CHNOTES || typeof PART === 'undefined') return null;
+    const notes = CHNOTES[PART];
+    if (!notes) return null;
+    if (_sectionIndexCache[PART]) return _sectionIndexCache[PART];
+    const sections = [];
+    const df = Object.create(null); // word -> number of sections it appears in
+    Object.entries(notes).forEach(([chNum, ch]) => {
+      if (!ch || !Array.isArray(ch.s)) return;
+      ch.s.forEach((sec) => {
+        const titleWords = new Set(_keywords(sec.t || ''));
+        const wordSet = new Set(_keywords(_sectionText(sec)));
+        if (!wordSet.size) return;
+        wordSet.forEach(w => { df[w] = (df[w] || 0) + 1; });
+        sections.push({ chNum, chTitle: ch.t || '', sec: sec.t || '', titleWords, wordSet, snippet: _sectionText(sec).slice(0, 500) });
+      });
+    });
+    const index = { sections, df, N: sections.length };
+    _sectionIndexCache[PART] = index;
+    return index;
+  }
+  // Core grounded search: scores every section of the CURRENT PART's study-guide
+  // notes against arbitrary query text, returns verbatim matches (no AI involved,
+  // no network call — just keyword overlap against the actual book data).
+  // Uses IDF-style weighting so rare, specific words (e.g. "medicare", "niit")
+  // dominate the score over words that are common across the whole book (e.g.
+  // "tax", "married", "threshold") — otherwise long, generic sections that happen
+  // to mention filing statuses win purely on raw hit count over the one section
+  // that's actually about the concept asked for. Title matches count 3x a body hit.
+  function _ragSearchByText(queryText, maxHits){
+    try {
+      const index = _getSectionIndex();
+      if (!index) return [];
+      const qWords = Array.from(new Set(_keywords(queryText)));
+      if (!qWords.length) return [];
+      const qWordSet = new Set(qWords);
+      const scored = [];
+      index.sections.forEach(s => {
+        let score = 0, hits = 0;
+        qWords.forEach(w => {
+          const inTitle = s.titleWords.has(w);
+          const inBody = s.wordSet.has(w);
+          if (!inTitle && !inBody) return;
+          hits++;
+          const idf = Math.log((index.N + 1) / (1 + (index.df[w] || 0)));
+          score += idf * (inTitle ? 3 : 1);
+        });
+        if (hits < 2) return; // require at least 2 distinct keyword overlaps
+        // Title-coverage bonus: if most/all of THIS section's own title words show
+        // up in the query, the section is almost certainly the right answer even
+        // if its body text is short — e.g. a section titled "Net Investment Income
+        // Tax (NIIT)" when the query says "...net investment income tax...". Plain
+        // idf-sum alone loses this to longer, only tangentially-related sections.
+        if (s.titleWords.size) {
+          let titleMatched = 0;
+          s.titleWords.forEach(w => { if (qWordSet.has(w)) titleMatched++; });
+          const coverage = titleMatched / s.titleWords.size;
+          if (coverage >= 0.6) score += 18 * coverage;
+        }
+        scored.push({ chNum: s.chNum, chTitle: s.chTitle, sec: s.sec, score, snippet: s.snippet });
+      });
+      scored.sort((a, b) => b.score - a.score);
+      return scored.slice(0, maxHits || 2);
+    } catch(e) { return []; }
+  }
   function _ragSearch(currentQ, maxHits){
     try {
-      if (typeof CHNOTES === 'undefined' || !CHNOTES || typeof PART === 'undefined') return '';
-      const notes = CHNOTES[PART];
-      if (!notes) return '';
       // Build the query terms from the question + all answer options + topic
       const queryParts = [currentQ.q || ''];
       (currentQ.opts || []).forEach(o => queryParts.push(o));
       if (currentQ.topic) queryParts.push(currentQ.topic);
-      const qWords = new Set(_keywords(queryParts.join(' ')));
-      if (!qWords.size) return '';
-      // Score every section across every chapter
-      const scored = [];
-      Object.entries(notes).forEach(([chNum, ch]) => {
-        if (!ch || !Array.isArray(ch.s)) return;
-        ch.s.forEach((sec, si) => {
-          const text = _sectionText(sec);
-          const wds = _keywords(text);
-          if (!wds.length) return;
-          let hits = 0;
-          const seen = new Set();
-          wds.forEach(w => { if (qWords.has(w) && !seen.has(w)) { hits++; seen.add(w); } });
-          if (hits < 2) return; // require at least 2 distinct keyword overlaps
-          // Score: hits per unique term seen in section (favors focused sections)
-          const score = hits + Math.min(hits / Math.max(1, wds.length) * 5, 3);
-          const snippet = text.slice(0, 400);
-          scored.push({ chNum, chTitle: ch.t || '', sec: sec.t || '', score, snippet });
-        });
-      });
-      scored.sort((a, b) => b.score - a.score);
-      const top = scored.slice(0, maxHits || 2);
+      const top = _ragSearchByText(queryParts.join(' '), maxHits);
       if (!top.length) return '';
       let out = 'RETRIEVED STUDY-GUIDE PASSAGES (relevant sections from anywhere in the book, not just the current chapter):\n';
       top.forEach((h, i) => {
@@ -771,8 +860,12 @@
         addMsg('You need to be viewing a question for me to save its topic — open one and try again.', false);
       } else {
         const entry = addToStudyList(curQ, q);
+        const refCount = Array.isArray(entry.refs) ? entry.refs.length : 0;
         addMsg('Added **' + entry.topic + '**' + (entry.unit ? ' (' + entry.unit + ')' : '') +
-          ' to your study list ✓. Tap 📚 up top any time to see everything you\'ve saved (' +
+          ' to your study list ✓' +
+          (refCount ? (' — pulled ' + refCount + ' matching passage' + (refCount > 1 ? 's' : '') + ' straight from the book.') :
+            ' — no exact passage matched in the book, so your note is saved as a reminder instead.') +
+          ' Tap 📚 up top any time to see everything you\'ve saved (' +
           _loadStudyList().length + ' so far).', false);
       }
       return;
@@ -960,6 +1053,11 @@
       }
     } catch(e) {}
 
+    // Only requests actually about the answer choices get the A/B/C/D treatment.
+    // Concept explanations, chapter summaries, mnemonics, practice questions, and
+    // general questions must NOT get it, even though the options are in context below.
+    const wantsBreakdown = /\b(explain this question|why (is|was)( my)? (the )?answer|why.*\bwrong\b|break ?down|wrong answer|trap answer)\b/i.test(q);
+
     const fullPrompt =
       'ROLE: You are an expert EA-exam tutor. Teach clearly, cite authority (IRC section, Circular 230 § number, ' +
       'IRS Publication, form number) whenever a rule has one, and always tie your answer back to what will actually ' +
@@ -969,17 +1067,21 @@
       'mileage rate, and threshold you cite MUST be the tax year 2025 figure. Do not use 2024 or earlier numbers. ' +
       'If you are unsure a specific number is the 2025 figure, say so plainly rather than guessing. Account for the ' +
       'One Big Beautiful Bill Act (OBBBA) where it applies.\n\n' +
-      'GROUND TRUTH: If a CORRECT ANSWER and a BOOK EXPLANATION are provided below, treat them as authoritative. ' +
-      'Your job is to explain WHY the correct answer is correct and WHY each wrong option is wrong — not to ' +
-      're-derive the answer or contradict the book. If the book explanation is brief or unclear, expand on it.\n\n' +
+      'GROUND TRUTH: If a CORRECT ANSWER and a BOOK EXPLANATION are provided below, treat them as authoritative — ' +
+      'never re-derive the answer or contradict the book, and expand on the book explanation if it is brief or unclear.\n\n' +
       'STYLE: Use clean markdown — **bold** for key terms, ### for short section headings, - for bullet lists. ' +
-      'When you contrast wrong answers, use a compact list ("Why A is wrong: …", "Why C is wrong: …"). ' +
       'End with a one-line "**Key takeaway:**" that captures the rule the student should memorize.\n\n' +
       'DO NOT emit LaTeX ($\\rightarrow$, $\\leq$, $\\alpha$, etc.). Write real characters: →, ≤, α. ' +
       'DO NOT restate the question back to the student verbatim — go straight into the explanation.\n\n' +
       _learningProfileContext(_cq, q) +
       historyBlock +
       context +
+      (wantsBreakdown
+        ? 'THIS TURN: the student is asking about the answer choices. Walk through why the correct answer is right ' +
+          'and, in a compact list, why each wrong option is wrong ("Why A is wrong: …").\n\n'
+        : 'THIS TURN — CRITICAL: the student is NOT asking about the answer choices. Do not mention option A, B, C, ' +
+          'or D, and do not write anything resembling "why X is wrong" or a breakdown of the choices. The answer ' +
+          'options above are background only. Answer ONLY the exact request in STUDENT QUESTION below.\n\n') +
       'STUDENT QUESTION (this turn): ' + q;
 
     // Try the request, with one automatic retry on empty response.
