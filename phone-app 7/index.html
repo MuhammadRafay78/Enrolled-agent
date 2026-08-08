@@ -4196,10 +4196,17 @@ __boot();
   <div id="ai-tutor-resize" title="Drag to resize"></div>
   <div id="ai-tutor-header">
     <span>EA Tutor</span>
-    <span id="ai-tutor-close">×</span>
+    <span id="ai-tutor-header-right">
+      <button type="button" id="ai-tutor-list-btn" title="My Study List">📚<span id="ai-tutor-list-count" class="ai-list-count" style="display:none">0</span></button>
+      <span id="ai-tutor-close">×</span>
+    </span>
   </div>
   <div id="ai-tutor-messages">
-    <div class="ai-msg bot">Hi. Ask me about the current question or any EA exam topic.</div>
+    <div class="ai-msg bot">Hi. Ask me about the current question or any EA exam topic. Tell me to "add this to my list" any time to save the current topic for later review.</div>
+  </div>
+  <div id="ai-tutor-list-view" style="display:none">
+    <button type="button" id="ai-tutor-list-back">← Back to chat</button>
+    <div id="ai-tutor-list-items"></div>
   </div>
   <div id="ai-tutor-quicks">
     <button type="button" data-qp="explain">Explain this question</button>

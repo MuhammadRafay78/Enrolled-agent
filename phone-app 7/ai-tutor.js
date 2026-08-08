@@ -46,8 +46,6 @@
   btn.onclick = () => {
     if (!_aiAllowed()) { _refreshAiVisibility(); return; }
     panel.style.display = 'flex'; btn.style.display = 'none'; panel.classList.remove('minimized'); _setAiOpen(true);
-    // Restore this question's saved conversation, if any
-    try { _lastQHash = ''; _syncChatToCurrentQuestion(); } catch(e) {}
     setTimeout(()=>input.focus(),100);
   };
   closeBtn.onclick = (e) => { e.stopPropagation(); panel.style.display = 'none'; btn.style.display = 'flex'; _setAiOpen(false); };
@@ -58,6 +56,29 @@
     _setAiOpen(!panel.classList.contains('minimized'));
     if (!panel.classList.contains('minimized')) setTimeout(()=>input.focus(),100);
   };
+
+  // ---- My Study List panel (toggle in place of the chat) ----
+  const listBtn = document.getElementById('ai-tutor-list-btn');
+  const listView = document.getElementById('ai-tutor-list-view');
+  const listBackBtn = document.getElementById('ai-tutor-list-back');
+  const quicksEl = document.getElementById('ai-tutor-quicks');
+  const inputWrapEl = document.getElementById('ai-tutor-input-wrap');
+  function _showStudyList(show){
+    listView.style.display = show ? 'flex' : 'none';
+    messages.style.display = show ? 'none' : 'block';
+    quicksEl.style.display = show ? 'none' : 'flex';
+    inputWrapEl.style.display = show ? 'none' : 'flex';
+    if (show) renderStudyListView(); else setTimeout(()=>input.focus(),50);
+  }
+  if (listBtn) listBtn.onclick = (e) => { e.stopPropagation(); _showStudyList(true); };
+  if (listBackBtn) listBackBtn.onclick = (e) => { e.stopPropagation(); _showStudyList(false); };
+  const listItemsEl = document.getElementById('ai-tutor-list-items');
+  if (listItemsEl) listItemsEl.addEventListener('click', (e) => {
+    const btn2 = e.target.closest('.ai-list-remove');
+    if (!btn2) return;
+    const card = btn2.closest('.ai-list-item');
+    if (card) removeFromStudyList(card.dataset.id);
+  });
   window.addEventListener('resize', () => {
     // Re-evaluate reflow when window crosses the 1024px threshold
     if(panel.style.display === 'flex' && !panel.classList.contains('minimized')) _setAiOpen(true);
@@ -107,44 +128,122 @@
       localStorage.setItem(CHATS_KEY, JSON.stringify(all));
     }catch(e){}
   }
+  // ---- Continuous chat log (what's actually displayed) ----
+  // One flat, chronological list across ALL questions — switching questions no
+  // longer clears the pane. Each entry still remembers which question it was
+  // asked under (qhash/topic/unit) so saveChatForCurrentQ() below can derive
+  // the per-question view that cross-question memory relies on.
+  const CHAT_LOG_KEY = 'ea3quiz_v2_ai_chat_log';
+  const CHAT_LOG_MAX = 300; // cap so localStorage never balloons
+  function _loadChatLog(){
+    try{ const v = JSON.parse(localStorage.getItem(CHAT_LOG_KEY)); return Array.isArray(v) ? v : []; }catch(e){ return []; }
+  }
+  function _appendToChatLog(role, text){
+    try{
+      const q = _currentQuestion();
+      const log = _loadChatLog();
+      log.push({ r: role, t: text, ts: Date.now(), qhash: q ? _questionHash(q) : '', topic: (q && q.topic) || '', unit: (q && q.unit) || '' });
+      while (log.length > CHAT_LOG_MAX) log.shift();
+      localStorage.setItem(CHAT_LOG_KEY, JSON.stringify(log));
+    }catch(e){}
+  }
+  function _replayLogEntry(e){
+    const div = document.createElement('div');
+    div.className = 'ai-msg ' + (e.r === 'u' ? 'user' : 'bot');
+    if (e.r === 'u') div.textContent = e.t;
+    else div.innerHTML = e.t;
+    messages.appendChild(div);
+  }
+  function hydrateChatLog(){
+    _loadChatLog().forEach(_replayLogEntry);
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  // ---- "My Study List" — topics/concepts saved by saying "add this to my list" ----
+  const STUDY_LIST_KEY = 'ea3quiz_v2_study_list';
+  const STUDY_LIST_MAX = 300;
+  // Matches common phrasings of the save-for-later intent. Deliberately broad —
+  // false negatives (not detecting it) are worse than false positives here.
+  const ADD_TO_LIST_RE = /\b(add|save|put)\s+(this|it)?\s*(to|into|on)\s+my\s+(study\s+)?list\b|\bmaster\s+(this\s+)?later\b|\badd\s+(this\s+)?to\s+(my\s+)?list\b|\b(need|have)\s+to\s+(re[- ]?study|master|review)\s+this\s+later\b/i;
+  function _looksLikeAddToList(msg){ return ADD_TO_LIST_RE.test(msg); }
+  function _loadStudyList(){
+    try{ const v = JSON.parse(localStorage.getItem(STUDY_LIST_KEY)); return Array.isArray(v) ? v : []; }catch(e){ return []; }
+  }
+  function _saveStudyList(list){
+    try{
+      while (list.length > STUDY_LIST_MAX) list.shift();
+      localStorage.setItem(STUDY_LIST_KEY, JSON.stringify(list));
+    }catch(e){}
+  }
+  // note: whatever the user typed alongside the trigger phrase (e.g. "I keep messing
+  // this up, add it to my list" -> the note is the full message, kept for context).
+  function addToStudyList(q, note){
+    const list = _loadStudyList();
+    const qhash = q ? _questionHash(q) : '';
+    // Don't duplicate the same question — bump it to the top instead.
+    const existingIdx = qhash ? list.findIndex(x => x.qhash === qhash) : -1;
+    const entry = {
+      id: existingIdx >= 0 ? list[existingIdx].id : (Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
+      topic: (q && q.topic) || 'General',
+      unit: (q && q.unit) || '',
+      note: (note || '').trim(),
+      qhash: qhash,
+      addedAt: Date.now()
+    };
+    if (existingIdx >= 0) list.splice(existingIdx, 1);
+    list.push(entry);
+    _saveStudyList(list);
+    updateStudyListBadge();
+    return entry;
+  }
+  function removeFromStudyList(id){
+    const list = _loadStudyList().filter(x => x.id !== id);
+    _saveStudyList(list);
+    updateStudyListBadge();
+    renderStudyListView();
+  }
+  function updateStudyListBadge(){
+    const n = _loadStudyList().length;
+    const badge = document.getElementById('ai-tutor-list-count');
+    if (!badge) return;
+    badge.textContent = String(n);
+    badge.style.display = n > 0 ? 'inline-flex' : 'none';
+  }
+  function _esc(s){ return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function renderStudyListView(){
+    const el = document.getElementById('ai-tutor-list-items');
+    if (!el) return;
+    const list = _loadStudyList().slice().reverse(); // newest first
+    if (!list.length) {
+      el.innerHTML = '<div class="ai-list-empty">Nothing saved yet. Tell the tutor "add this to my list" on any question to save its topic here.</div>';
+      return;
+    }
+    el.innerHTML = list.map(function(e){
+      const d = new Date(e.addedAt);
+      const dateStr = isNaN(d) ? '' : d.toLocaleDateString(undefined, {month:'short', day:'numeric'});
+      return '<div class="ai-list-item" data-id="' + _esc(e.id) + '">' +
+        '<div class="ai-list-item-top"><strong>' + _esc(e.topic) + '</strong>' +
+          '<button type="button" class="ai-list-remove" title="Mark as mastered / remove">✓</button></div>' +
+        (e.unit ? '<div class="ai-list-item-unit">' + _esc(e.unit) + '</div>' : '') +
+        (e.note ? '<div class="ai-list-item-note">' + _esc(e.note) + '</div>' : '') +
+        (dateStr ? '<div class="ai-list-item-date">Added ' + dateStr + '</div>' : '') +
+        '</div>';
+    }).join('');
+  }
+
+  // ---- Per-question chat record (derived from the continuous log) ----
+  // Still keyed by question hash — this is what cross-question memory
+  // (_crossQuestionContext below) searches across, independent of display.
   function saveChatForCurrentQ(){
     const q = _currentQuestion();
     if (!q) return;
     const key = _questionHash(q);
     if (!key) return;
-    const bubbles = Array.from(messages.querySelectorAll('.ai-msg')).filter(m => {
-      const txt = (m.innerText || '').trim();
-      // Skip the greeting bubble
-      return txt && !/^Hi\. Ask me about/i.test(txt);
-    }).map(m => ({
-      r: m.classList.contains('user') ? 'u' : 'b',
-      // Store raw text for user, HTML for bot (so bot markdown formatting is preserved)
-      t: m.classList.contains('user') ? (m.innerText || '') : (m.innerHTML || '')
-    }));
+    const bubbles = _loadChatLog().filter(e => e.qhash === key).map(e => ({ r: e.r, t: e.t }));
     const all = _loadAllChats();
     if (bubbles.length === 0) { delete all[key]; }
     else all[key] = { m: bubbles, t: Date.now() };
     _saveAllChats(all);
-  }
-  function loadChatForCurrentQ(){
-    // Clear any existing bubbles except the greeting
-    Array.from(messages.querySelectorAll('.ai-msg')).forEach((m,i) => {
-      if (i > 0) m.remove(); // keep the first greeting
-    });
-    const q = _currentQuestion();
-    if (!q) return;
-    const key = _questionHash(q);
-    const all = _loadAllChats();
-    const rec = all[key];
-    if (!rec || !Array.isArray(rec.m)) return;
-    rec.m.forEach(b => {
-      const div = document.createElement('div');
-      div.className = 'ai-msg ' + (b.r === 'u' ? 'user' : 'bot');
-      if (b.r === 'u') div.textContent = b.t;
-      else div.innerHTML = b.t;
-      messages.appendChild(div);
-    });
-    messages.scrollTop = messages.scrollHeight;
   }
 
   // ---- Learning profile + weak areas (computed live from all localStorage state) ----
@@ -501,22 +600,6 @@
     }catch(e){ return ''; }
   }
 
-  // ---- Detect question change while panel is open, swap chat history ----
-  let _lastQHash = '';
-  function _syncChatToCurrentQuestion(){
-    const q = _currentQuestion();
-    const h = q ? _questionHash(q) : '';
-    if (h === _lastQHash) return;
-    _lastQHash = h;
-    loadChatForCurrentQ();
-  }
-  // Poll while panel is open; cheap and reliable across all view types
-  setInterval(() => {
-    if (panel.style.display === 'flex' && !panel.classList.contains('minimized')) {
-      _syncChatToCurrentQuestion();
-    }
-  }, 600);
-
   // Self-heal: if the current user is an admin, clear any stale rate-limit counter
   try {
     if (typeof isAdminUser === 'function' && isAdminUser()) {
@@ -570,6 +653,44 @@
     });
   }
 
+  // Turns a run of "| a | b |" lines (with a "| :--- | :--- |" separator
+  // row second) into a <table>. Runs after bold/italic so cell text like
+  // "**Form 8938**" has already become "<strong>Form 8938</strong>".
+  function splitTableRow(row) {
+    let r = row.trim();
+    if (r.startsWith('|')) r = r.slice(1);
+    if (r.endsWith('|')) r = r.slice(0, -1);
+    return r.split('|').map(c => c.trim());
+  }
+  function renderTables(html) {
+    const sepRe = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+    const lines = html.split('\n');
+    const out = [];
+    let i = 0;
+    while (i < lines.length) {
+      const header = lines[i], sep = lines[i + 1];
+      if (header && header.includes('|') && sep && sepRe.test(sep)) {
+        const headCells = splitTableRow(header);
+        const bodyRows = [];
+        let j = i + 2;
+        while (j < lines.length && lines[j].trim() !== '' && lines[j].includes('|')) {
+          bodyRows.push(splitTableRow(lines[j]));
+          j++;
+        }
+        let tbl = '<table><thead><tr>' + headCells.map(c => '<th>' + c + '</th>').join('') + '</tr></thead>';
+        if (bodyRows.length) {
+          tbl += '<tbody>' + bodyRows.map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('') + '</tbody>';
+        }
+        out.push(tbl + '</table>');
+        i = j;
+      } else {
+        out.push(header);
+        i++;
+      }
+    }
+    return out.join('\n');
+  }
+
   function renderMarkdown(text) {
     // Translate LaTeX commands into Unicode first
     text = stripLatex(text);
@@ -589,6 +710,11 @@
     html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
     // Italic
     html = html.replace(/(?<!\*)\*(?!\*)([^*\n]+)\*(?!\*)/g, '<em>$1</em>');
+    // Horizontal rules (a line that's just 3+ -/*/_ — must run before table
+    // detection since a bare "---" line has no "|" and won't match a table separator)
+    html = html.replace(/^ {0,3}([-*_])\1{2,}[ \t]*$/gm, '<hr>');
+    // Tables ("| a | b |" header + "| :--- | :--- |" separator + data rows)
+    html = renderTables(html);
     // Blockquotes
     html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
     // Unordered lists
@@ -603,7 +729,7 @@
     });
     // Paragraphs (wrap remaining lines)
     html = html.split(/\n\n+/).map(block => {
-      if (/^\s*<(h[1-3]|ul|ol|pre|blockquote)/.test(block)) return block;
+      if (/^\s*<(h[1-3]|ul|ol|pre|blockquote|table|hr)/.test(block)) return block;
       return '<p>'+block.replace(/\n/g,'<br>')+'</p>';
     }).join('');
     return html;
@@ -616,6 +742,9 @@
     else div.innerHTML = renderMarkdown(text);
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
+    // Store raw text for user bubbles, rendered HTML for bot bubbles (matches
+    // what's on screen) so continuous-log replay never re-runs the markdown pass.
+    _appendToChatLog(isUser ? 'u' : 'b', isUser ? text : div.innerHTML);
     return div;
   }
 
@@ -631,6 +760,23 @@
   async function send() {
     const q = input.value.trim();
     if (!q) return;
+
+    // ---- "Add this to my list" — handled entirely locally, no API call/quota spent ----
+    if (_looksLikeAddToList(q)) {
+      addMsg(q, true);
+      input.value = '';
+      input.style.height = 'auto';
+      const curQ = _currentQuestion();
+      if (!curQ) {
+        addMsg('You need to be viewing a question for me to save its topic — open one and try again.', false);
+      } else {
+        const entry = addToStudyList(curQ, q);
+        addMsg('Added **' + entry.topic + '**' + (entry.unit ? ' (' + entry.unit + ')' : '') +
+          ' to your study list ✓. Tap 📚 up top any time to see everything you\'ve saved (' +
+          _loadStudyList().length + ' so far).', false);
+      }
+      return;
+    }
 
     // ---- Rate limit: 30/day for regular users, unlimited for admins (Rafay, etc.) ----
     var isAdmin = false;
@@ -1016,4 +1162,9 @@
       localStorage.setItem(SIZE_KEY, JSON.stringify({ w: panel.offsetWidth }));
     } catch(e) {}
   });
+
+  // Must run after every const above has been initialized (not just hoisted) —
+  // called here at the bottom of the IIFE rather than near the top.
+  hydrateChatLog();
+  updateStudyListBadge();
 })();
