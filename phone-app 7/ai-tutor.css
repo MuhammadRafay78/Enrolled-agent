@@ -126,6 +126,15 @@
   .ai-list-explanation .ai-list-ref-src{color:#a855f7;}
   .ai-list-item-note{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5;}
   .ai-list-item-date{font-size:11px;color:var(--muted);margin-top:8px;}
+  .ai-add-list-btn{
+    display:block;margin-top:12px;
+    background:var(--bg);color:var(--blue);border:1px solid var(--blue);
+    border-radius:14px;padding:5px 12px;font-size:12.5px;font-weight:600;
+    cursor:pointer;transition:background .15s,opacity .15s;
+  }
+  .ai-add-list-btn:hover{background:var(--card);}
+  .ai-add-list-btn:disabled{cursor:default;opacity:.7;}
+  .ai-add-list-btn.added{color:#16a34a;border-color:#16a34a;}
   #ai-tutor-quicks{
     display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px 0;background:var(--card);
   }

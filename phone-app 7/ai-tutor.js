@@ -799,11 +799,21 @@
       'Delta':'Δ','Sigma':'Σ','Omega':'Ω','Pi':'Π',
       'checkmark':'✓','bullet':'•','dots':'…','ldots':'…','cdots':'⋯'
     };
+    // \text{...} / \mathrm{...} etc: keep only the inner content
+    text = text.replace(/\\(?:text|mathrm|mathbf|mathit|textbf|textit|operatorname)\{([^{}]*)\}/g, '$1');
+    // \frac{a}{b} -> a/b
+    text = text.replace(/\\frac\{([^{}]*)\}\{([^{}]*)\}/g, '$1/$2');
+    // Escaped punctuation the AI emits inside math mode: \% \$ \& \_ \#
+    text = text.replace(/\\([%$&_#])/g, '$1');
     // $...$, $$...$$, and \(...\) / \[...\] wrappers around a single command
     text = text.replace(/\${1,2}\\([a-zA-Z]+)\${1,2}/g, (_,cmd) => map[cmd] || cmd);
     text = text.replace(/\\[\(\[]\s*\\([a-zA-Z]+)\s*\\[\)\]]/g, (_,cmd) => map[cmd] || cmd);
     // Bare \rightarrow (no $ wrapping) also gets replaced
     text = text.replace(/\\([a-zA-Z]+)/g, (m,cmd) => map[cmd] !== undefined ? map[cmd] : m);
+    // Any remaining $$ block-math delimiters are just noise now that the
+    // commands inside are plain text — drop them. Single $ signs are left
+    // alone since they're almost always currency (e.g. "$4,800").
+    text = text.replace(/\$\$/g, '');
     return text;
   }
 
@@ -912,13 +922,58 @@
     const div = document.createElement('div');
     div.className = 'ai-msg ' + (isUser ? 'user' : 'bot');
     if (isUser) div.textContent = text;
-    else div.innerHTML = renderMarkdown(text);
+    else { div.innerHTML = renderMarkdown(text); _maybeAddListButton(div, div.innerHTML); }
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
     // Store raw text for user bubbles, rendered HTML for bot bubbles (matches
     // what's on screen) so continuous-log replay never re-runs the markdown pass.
     _appendToChatLog(isUser ? 'u' : 'b', isUser ? text : div.innerHTML);
     return div;
+  }
+
+  // Appends a "+ Add to my list" button under a bot reply that looks like a real
+  // explanation — long enough, and not one of our own confirmation/error messages.
+  // Clicking it saves the CURRENT question via the exact same addToStudyList() path
+  // as the old typed "add this to my list" trigger. The note passed is the student's
+  // own preceding question/prompt (not the trigger phrase, since there isn't one) —
+  // that's a much better anchor for the book-passage search than a bare "add this".
+  function _maybeAddListButton(div, rawHtml){
+    const plain = String(rawHtml || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (plain.length < 150) return;
+    if (/to your study list/i.test(plain)) return;
+    if (/^Error:|^The AI is busy/.test(plain)) return;
+    if (div.querySelector('.ai-add-list-btn')) return; // already added
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'ai-add-list-btn';
+    btn.textContent = '+ Add to my list';
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      if (btn.disabled) return;
+      btn.disabled = true;
+      btn.textContent = 'Saving…';
+      const curQ = _currentQuestion();
+      if (!curQ) {
+        btn.textContent = 'Open a question first';
+        setTimeout(() => { btn.disabled = false; btn.textContent = '+ Add to my list'; }, 1600);
+        return;
+      }
+      let note = plain;
+      const prevUser = div.previousElementSibling;
+      if (prevUser && prevUser.classList.contains('user') && prevUser.textContent.trim()) {
+        note = prevUser.textContent.trim();
+      }
+      try {
+        await addToStudyList(curQ, note);
+        updateStudyListBadge();
+        btn.textContent = '✓ Added';
+        btn.classList.add('added');
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = '+ Add to my list';
+      }
+    };
+    div.appendChild(btn);
   }
 
   function addTyping() {
@@ -1032,6 +1087,7 @@
           const div = document.createElement('div');
           div.className = 'ai-msg bot';
           div.innerHTML = renderMarkdown(hit.r);
+          _maybeAddListButton(div, div.innerHTML);
           messages.appendChild(div);
           messages.scrollTop = messages.scrollHeight;
           try { _appendToChatLog('b', div.innerHTML); } catch(e) {}
@@ -1233,6 +1289,7 @@
       const finalText = (typing.innerText || '').trim();
       if (finalText && !/^Error:|^The AI is busy/.test(finalText)) {
         _appendToChatLog('b', typing.innerHTML);
+        _maybeAddListButton(typing, typing.innerHTML);
       }
     } catch(e) {}
     // Save the completed exchange so the conversation reappears next time
