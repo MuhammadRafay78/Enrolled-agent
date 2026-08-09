@@ -49,6 +49,11 @@
     setTimeout(()=>input.focus(),100);
   };
   closeBtn.onclick = (e) => { e.stopPropagation(); panel.style.display = 'none'; btn.style.display = 'flex'; _setAiOpen(false); };
+  const clearBtn = document.getElementById('ai-tutor-clear-btn');
+  clearBtn.onclick = (e) => {
+    e.stopPropagation();
+    if (confirm('Clear this chat? This only clears the conversation, not your saved study list.')) clearAiChat();
+  };
   // Click header (but not close button) to minimize/expand
   document.getElementById('ai-tutor-header').onclick = () => {
     panel.classList.toggle('minimized');
@@ -167,6 +172,48 @@
   function hydrateChatLog(){
     _loadChatLog().forEach(_replayLogEntry);
     messages.scrollTop = messages.scrollHeight;
+  }
+  const AI_GREETING_HTML = '<div class="ai-msg bot">Hi. Ask me about the current question or any EA exam topic. Tell me to "add this to my list" any time to save the current topic for later review.</div>';
+  // Wipes the visible conversation and its persisted log (CHAT_LOG_KEY), back to
+  // the original greeting. Does NOT touch CHATS_KEY (the per-question archive
+  // saveChatForCurrentQ keeps) or the study list — those are separate, deliberately
+  // durable stores. `noteText`, if given, is shown as a small divider instead of
+  // silently emptying the pane, so an automatic clear (see below) doesn't read as
+  // "my chat vanished" — the reason is right there.
+  function clearAiChat(noteText){
+    try{ localStorage.removeItem(CHAT_LOG_KEY); }catch(e){}
+    messages.innerHTML = AI_GREETING_HTML;
+    if (noteText) {
+      const div = document.createElement('div');
+      div.className = 'ai-msg-divider';
+      div.textContent = noteText;
+      messages.insertBefore(div, messages.firstChild);
+    }
+  }
+  // ---- Auto-clear on context switch (quiz questions <-> chapter notes <-> flashcards) ----
+  // The flat chat log above deliberately survives navigating within one kind of
+  // study session (e.g. moving between quiz questions) so nothing gets lost. But
+  // it has no idea when you've moved to an unrelated kind of session entirely —
+  // asking about a quiz question, then going to read a chapter, kept replaying
+  // the old question chat on top of the notes. markView() already tracks every
+  // navigation (part/kind/unit) for scroll restoration; wrapping it here — the
+  // same "patch the global, call through" idiom account-sync.js uses for
+  // localStorage — is the least invasive way to notice a genuine mode change
+  // without touching app-boot.js or every screen that calls markView().
+  const AI_CONTEXT_CATEGORY = { quiz:'quiz', notes:'notes', flashcards:'flashcards', chapfcbrowse:'flashcards' };
+  const AI_CONTEXT_LABEL = { quiz:'quiz questions', notes:'chapter notes', flashcards:'flashcards' };
+  let _lastAiContentCategory = null;
+  const _origMarkView = window.markView;
+  if (typeof _origMarkView === 'function') {
+    window.markView = function(kind, extra){
+      _origMarkView(kind, extra);
+      const cat = AI_CONTEXT_CATEGORY[kind];
+      if (!cat) return; // menus/lists/dashboard etc. aren't a "session" — don't clear on those
+      if (_lastAiContentCategory && cat !== _lastAiContentCategory) {
+        clearAiChat('— switched to ' + AI_CONTEXT_LABEL[cat] + ', started a new chat —');
+      }
+      _lastAiContentCategory = cat;
+    };
   }
 
   // ---- "My Study List" — topics/concepts saved by saying "add this to my list" ----
