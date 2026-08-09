@@ -174,7 +174,11 @@
   const STUDY_LIST_MAX = 300;
   // Matches common phrasings of the save-for-later intent. Deliberately broad —
   // false negatives (not detecting it) are worse than false positives here.
-  const ADD_TO_LIST_RE = /\b(add|save|put)\s+(this|it)?\s*(to|into|on)\s+my\s+(study\s+)?list\b|\bmaster\s+(this\s+)?later\b|\badd\s+(this\s+)?to\s+(my\s+)?list\b|\b(need|have)\s+to\s+(re[- ]?study|master|review)\s+this\s+later\b/i;
+  // Bounded gap (.{0,60}) between the verb and "list" so natural phrasing like
+  // "add this question concept into my list" still matches — the old version
+  // required "add"/"save"/"put" to be immediately followed by "to/into/on my
+  // list" with nothing in between, which real messages rarely are.
+  const ADD_TO_LIST_RE = /\b(add|save|put)\b.{0,60}\b(my\s+)?(study\s+)?list\b|\bmaster\s+(this\s+)?later\b|\b(need|have)\s+to\s+(re[- ]?study|master|review)\s+this\s+later\b|\bremember\s+this\s+for\s+later\b/i;
   function _looksLikeAddToList(msg){ return ADD_TO_LIST_RE.test(msg); }
   function _loadStudyList(){
     try{ const v = JSON.parse(localStorage.getItem(STUDY_LIST_KEY)); return Array.isArray(v) ? v : []; }catch(e){ return []; }
@@ -185,27 +189,96 @@
       localStorage.setItem(STUDY_LIST_KEY, JSON.stringify(list));
     }catch(e){}
   }
+  // Latest substantial bot reply already in THIS chat for this exact question
+  // (e.g. from "Explain the concept") — reused instead of writing new content,
+  // since it's free and it's exactly what the student already asked about.
+  function _extractPriorAiExplanation(qhash){
+    try {
+      if (!qhash) return '';
+      const log = _loadChatLog();
+      for (let i = log.length - 1; i >= 0; i--) {
+        const e = log[i];
+        if (e.r !== 'b' || e.qhash !== qhash) continue;
+        const plain = String(e.t).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        if (plain.length < 150) continue; // skip short confirmations, e.g. "Added ... to your list"
+        if (/to your study list/i.test(plain)) continue; // skip our own confirmation messages
+        return plain.slice(0, 2000);
+      }
+      return '';
+    } catch(e) { return ''; }
+  }
+  // Only called when local keyword search's best match is weak (a vague note like
+  // "this question concept" rarely shares enough real words with any ONE section
+  // to score well). Asks the AI to pick from an already-matched shortlist — NOT to
+  // write new content — so the saved text stays grounded in the book either way.
+  // Return contract (three distinct outcomes, handled differently by the caller):
+  //   a candidate object -> AI picked a real match, use it
+  //   null               -> AI explicitly said none of the candidates are relevant
+  //   undefined          -> couldn't reach/parse the AI at all (network, rate limit, etc.)
+  async function _aiRerankBestSection(q, note, candidates){
+    try {
+      if (!candidates.length) return undefined;
+      const listText = candidates.map((c, i) => (i + 1) + '. Ch ' + c.chNum + ' — ' + c.chTitle + ' § ' + c.sec).join('\n');
+      const prompt = 'A student wants to save ONE study-guide section for later review. Pick the single best match from the ' +
+        'numbered list below, based on the current question and the student\'s note. Reply with ONLY the number (e.g. "3"). ' +
+        'If none are a good match, reply with exactly: NONE\n\n' +
+        'CURRENT QUESTION: ' + ((q && q.q) || '') + '\n' +
+        (q && q.topic ? 'TOPIC: ' + q.topic + '\n' : '') +
+        'STUDENT NOTE: ' + note + '\n\nCANDIDATE SECTIONS:\n' + listText;
+      const res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt })
+      });
+      if (!res.ok || !res.body) return undefined;
+      const reader = res.body.getReader(), decoder = new TextDecoder();
+      let text = '';
+      while (true) { const { done, value } = await reader.read(); if (done) break; text += decoder.decode(value, { stream: true }); }
+      text = text.trim();
+      if (/^NONE\b/i.test(text)) return null;
+      const m = text.match(/\d+/);
+      if (!m) return undefined;
+      const idx = parseInt(m[0], 10) - 1;
+      return (idx >= 0 && idx < candidates.length) ? candidates[idx] : undefined;
+    } catch(e) { return undefined; }
+  }
   // note: whatever the user typed alongside the trigger phrase (e.g. "I keep messing
   // this up, add it to my list" -> the note is the full message, kept for context).
-  function addToStudyList(q, note){
+  async function addToStudyList(q, note){
     const list = _loadStudyList();
     const qhash = q ? _questionHash(q) : '';
     // Don't duplicate the same question — bump it to the top instead.
     const existingIdx = qhash ? list.findIndex(x => x.qhash === qhash) : -1;
-    // Ground this in the actual book text — no AI call, pure keyword match against
-    // CHNOTES, so what gets saved is verbatim from the source guide. Search the
-    // user's own note FIRST and ONLY: that's what names the specific concept (e.g.
-    // "NIIT threshold"), and it's often a *different* section than the question
-    // currently on screen. Blending in the question's own topic/text here would
-    // just bias every result back toward the current section regardless of what
-    // the student actually asked to save — only fall back to that if the note
-    // alone (e.g. a bare "add this to my list") doesn't match anything.
-    // 5, not 3 — a note naming two distinct concepts (e.g. "Medicare tax AND NIIT
-    // thresholds") needs room for a good match on each, not just the single best.
-    let refs = _ragSearchByText(note || '', 5);
-    if (!refs.length) {
+    // Ground this in the actual book text. Search the user's own note FIRST and
+    // ONLY: that's what names the specific concept (e.g. "NIIT threshold"), and
+    // it's often a *different* section than the question currently on screen.
+    // Blending in the question's own topic/text here would just bias every result
+    // back toward the current section — only fall back to that if the note alone
+    // (e.g. a bare "add this to my list") matches nothing.
+    const WEAK_SCORE_THRESHOLD = 15;
+    let candidates = _ragSearchByText(note || '', 8);
+    // Confidence is judged on the NOTE-ONLY result, before any fallback — the
+    // fallback query blends in the full current-question text, which is long
+    // enough to rack up an artificially high score against totally unrelated
+    // sections just from incidental word overlap. A high score there doesn't
+    // mean the match is actually good, so it must never skip the AI-rerank step.
+    const noteWasConfident = candidates.length && candidates[0].score >= WEAK_SCORE_THRESHOLD;
+    if (!candidates.length) {
       const fallbackQuery = [note, q && q.topic, q && q.q].filter(Boolean).join(' ');
-      refs = _ragSearchByText(fallbackQuery, 5);
+      candidates = _ragSearchByText(fallbackQuery, 8);
+    }
+    // Confident local match on the note itself -> use it directly, no network call.
+    // Anything else (vague note, or only the blended fallback found something) ->
+    // let the AI disambiguate among the shortlist. Either way what gets saved is
+    // verbatim book text, never AI prose.
+    let refs;
+    if (noteWasConfident) {
+      refs = candidates.slice(0, 3);
+    } else if (candidates.length && q) {
+      const picked = await _aiRerankBestSection(q, note, candidates);
+      if (picked === null) refs = []; // AI looked and confirmed none of the candidates are actually relevant
+      else if (picked) refs = [picked]; // AI picked the one real match
+      else refs = candidates.slice(0, 3); // AI call failed/unreachable — best-effort local fallback
+    } else {
+      refs = candidates.slice(0, 3);
     }
     const entry = {
       id: existingIdx >= 0 ? list[existingIdx].id : (Date.now().toString(36) + Math.random().toString(36).slice(2, 7)),
@@ -213,6 +286,7 @@
       unit: (q && q.unit) || '',
       part: (typeof PART !== 'undefined') ? PART : null,
       note: (note || '').trim(),
+      aiExplanation: _extractPriorAiExplanation(qhash), // already-in-chat explanation, if any
       refs: refs, // verbatim book excerpts — see _ragSearchByText
       qhash: qhash,
       addedAt: Date.now()
@@ -260,6 +334,9 @@
             '</div>';
           }).join('')
         : '<div class="ai-list-ref-none">No exact passage matched in the book for this — your note is kept below as a reminder of what to look up.</div>';
+      const explanationHtml = e.aiExplanation
+        ? '<div class="ai-list-explanation"><div class="ai-list-ref-src">From this chat</div>' + _esc(e.aiExplanation) + '</div>'
+        : '';
       return '<div class="ai-list-item' + (open ? ' open' : '') + '" data-id="' + _esc(e.id) + '">' +
         '<div class="ai-list-item-top">' +
           '<div class="ai-list-item-head"><strong>' + _esc(e.topic) + '</strong>' +
@@ -268,6 +345,7 @@
           '<button type="button" class="ai-list-remove" title="Mark as mastered / remove">✓</button>' +
         '</div>' +
         '<div class="ai-list-item-body" style="display:' + (open ? 'block' : 'none') + '">' +
+          explanationHtml +
           refsHtml +
           (e.note ? '<div class="ai-list-item-note">Your note: ' + _esc(e.note) + '</div>' : '') +
           (dateStr ? '<div class="ai-list-item-date">Added ' + dateStr + '</div>' : '') +
@@ -580,14 +658,20 @@
     if (_sectionIndexCache[PART]) return _sectionIndexCache[PART];
     const sections = [];
     const df = Object.create(null); // word -> number of sections it appears in
+    const seenKeys = new Set(); // some chapters have the same section title twice in the source data
     Object.entries(notes).forEach(([chNum, ch]) => {
       if (!ch || !Array.isArray(ch.s)) return;
       ch.s.forEach((sec) => {
+        const dedupeKey = chNum + '::' + (sec.t || '');
+        if (seenKeys.has(dedupeKey)) return;
+        seenKeys.add(dedupeKey);
         const titleWords = new Set(_keywords(sec.t || ''));
         const wordSet = new Set(_keywords(_sectionText(sec)));
         if (!wordSet.size) return;
         wordSet.forEach(w => { df[w] = (df[w] || 0) + 1; });
-        sections.push({ chNum, chTitle: ch.t || '', sec: sec.t || '', titleWords, wordSet, snippet: _sectionText(sec).slice(0, 500) });
+        // Full text, not a snippet — a saved list item should show everything from
+        // the matched section, not a 500-char fragment. Capped only as a safety net.
+        sections.push({ chNum, chTitle: ch.t || '', sec: sec.t || '', titleWords, wordSet, fullText: _sectionText(sec).slice(0, 4000) });
       });
     });
     const index = { sections, df, N: sections.length };
@@ -632,7 +716,7 @@
           const coverage = titleMatched / s.titleWords.size;
           if (coverage >= 0.6) score += 18 * coverage;
         }
-        scored.push({ chNum: s.chNum, chTitle: s.chTitle, sec: s.sec, score, snippet: s.snippet });
+        scored.push({ chNum: s.chNum, chTitle: s.chTitle, sec: s.sec, score, snippet: s.fullText });
       });
       scored.sort((a, b) => b.score - a.score);
       return scored.slice(0, maxHits || 2);
@@ -859,12 +943,17 @@
       if (!curQ) {
         addMsg('You need to be viewing a question for me to save its topic — open one and try again.', false);
       } else {
-        const entry = addToStudyList(curQ, q);
+        // Usually resolves instantly (pure local search); only pauses here on a
+        // vague note that needs the AI to pick among candidates.
+        const typing = addTyping();
+        const entry = await addToStudyList(curQ, q);
+        typing.remove();
         const refCount = Array.isArray(entry.refs) ? entry.refs.length : 0;
         addMsg('Added **' + entry.topic + '**' + (entry.unit ? ' (' + entry.unit + ')' : '') +
           ' to your study list ✓' +
           (refCount ? (' — pulled ' + refCount + ' matching passage' + (refCount > 1 ? 's' : '') + ' straight from the book.') :
             ' — no exact passage matched in the book, so your note is saved as a reminder instead.') +
+          (entry.aiExplanation ? ' Also kept the explanation from this chat.' : '') +
           ' Tap 📚 up top any time to see everything you\'ve saved (' +
           _loadStudyList().length + ' so far).', false);
       }
@@ -945,6 +1034,7 @@
           div.innerHTML = renderMarkdown(hit.r);
           messages.appendChild(div);
           messages.scrollTop = messages.scrollHeight;
+          try { _appendToChatLog('b', div.innerHTML); } catch(e) {}
           try { saveChatForCurrentQ(); } catch(e) {}
           sendBtn.disabled = false;
           input.focus();
@@ -1136,6 +1226,15 @@
       typing.textContent = 'Error: could not reach the AI. Please try again.';
     }
     sendBtn.disabled = false;
+    // The streaming path above writes directly into `typing`'s innerHTML, bypassing
+    // addMsg() (and its automatic logging) entirely — without this, real AI answers
+    // would never survive navigation or a reload, unlike every other message type.
+    try {
+      const finalText = (typing.innerText || '').trim();
+      if (finalText && !/^Error:|^The AI is busy/.test(finalText)) {
+        _appendToChatLog('b', typing.innerHTML);
+      }
+    } catch(e) {}
     // Save the completed exchange so the conversation reappears next time
     try { saveChatForCurrentQ(); } catch(e) {}
     // Write to the response cache so an identical repeat won't burn tokens

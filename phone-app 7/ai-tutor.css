@@ -120,8 +120,10 @@
   .ai-list-item-body{padding:0 14px 14px;}
   .ai-list-ref{border-left:3px solid var(--blue);padding:6px 0 6px 10px;margin-bottom:8px;}
   .ai-list-ref-src{font-size:11px;font-weight:700;color:var(--blue);text-transform:uppercase;letter-spacing:.02em;margin-bottom:3px;}
-  .ai-list-ref-text{font-size:13px;color:var(--ink);line-height:1.55;}
+  .ai-list-ref-text{font-size:13px;color:var(--ink);line-height:1.55;white-space:pre-wrap;}
   .ai-list-ref-none{font-size:12.5px;color:var(--muted);font-style:italic;margin-bottom:8px;}
+  .ai-list-explanation{border-left:3px solid #a855f7;padding:6px 0 6px 10px;margin-bottom:10px;font-size:13px;color:var(--ink);line-height:1.55;white-space:pre-wrap;}
+  .ai-list-explanation .ai-list-ref-src{color:#a855f7;}
   .ai-list-item-note{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.5;}
   .ai-list-item-date{font-size:11px;color:var(--muted);margin-top:8px;}
   #ai-tutor-quicks{

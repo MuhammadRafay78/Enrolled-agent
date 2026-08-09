@@ -1,6 +1,6 @@
 // Cache the whole app so it opens instantly and works with no signal.
 // Bump CACHE when the app changes; the old cache is deleted on activate.
-const CACHE = 'ea-prep-v54';
+const CACHE = 'ea-prep-v55';
 const ASSETS = ['./','./index.html','./manifest.webmanifest',
   './icon-192.png','./icon-512.png','./icon-192-maskable.png','./icon-512-maskable.png','./apple-touch-icon.png'];
 
