@@ -120,13 +120,17 @@ function restoreView(){
 document.getElementById('gridToggle').onclick=function(){side.classList.toggle('open');};
 // ---------- floating back button (follows you down the page) ----------
 var FLOATBACK=null;
-// Only float when the page is actually long enough to scroll — on a short page the
-// in-card "← Back" button is already visible, so a hovering copy would just be clutter.
+// Only float once the page is actually long enough to scroll AND you've
+// scrolled some way down it — right at the top, the in-card "← Back" button
+// is already on screen, so showing the floating copy there too just sits on
+// top of whatever content happens to be at that fixed corner (e.g. the
+// Chapter Notes flashcards button or the first side-panel row on a phone).
 function syncFloatBack(){
   var b=document.getElementById('floatBack');
   if(!b)return;
   var scrollable=(document.documentElement.scrollHeight||0)>(window.innerHeight||0)+120;
-  if(FLOATBACK&&scrollable)b.classList.add('show'); else b.classList.remove('show');
+  var scrolled=(window.pageYOffset||document.documentElement.scrollTop||0)>160;
+  if(FLOATBACK&&scrollable&&scrolled)b.classList.add('show'); else b.classList.remove('show');
 }
 function setFloatBack(fn,label){
   FLOATBACK=fn||null;

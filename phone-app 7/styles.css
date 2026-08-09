@@ -176,6 +176,24 @@
   .ntable th,.ntable td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top;}
   .ntable th{background:#f1f5f9;font-weight:700;}
   body.is-dark .ntable th{background:#243044;}
+  .ntable .form-col{width:132px;}
+  /* Below ~480px, three-plus columns squeeze into a one-letter-per-line mess
+     no matter how the width is distributed — stack each row into a labeled
+     card instead. data-label (set in notes.js) supplies the per-cell label
+     that the header row would otherwise have shown, since the header row
+     itself is hidden here (its own cells have nothing to stack into).
+     Scoped away from .ntable.sheet: the Key Numbers sheet nests colspan'd
+     sub-tables and chip lists in this same class and hasn't been adapted
+     for the stacked-card shape — out of scope here, don't drag it in. */
+  @media(max-width:480px){
+    .ntable:not(.sheet),.ntable:not(.sheet) tbody,.ntable:not(.sheet) tr{display:block;width:100%;}
+    .ntable:not(.sheet) tr{border:1px solid var(--border);border-radius:8px;margin-bottom:10px;overflow:hidden;}
+    .ntable:not(.sheet) tr:first-child{display:none;}
+    .ntable:not(.sheet) td{display:block;width:auto !important;border:none;border-bottom:1px solid var(--border);padding:8px 10px;}
+    .ntable:not(.sheet) td:last-child{border-bottom:none;}
+    .ntable:not(.sheet) td::before{content:attr(data-label);display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:2px;}
+    .ntable:not(.sheet) td:empty::before{content:none;}
+  }
   .fbook{margin-top:6px;padding:6px 9px;background:#f8fafc;border-left:3px solid var(--border);font-size:12.5px;color:#475569;line-height:1.5;}
   body.is-dark .fbook{background:#1c2739;color:#b8c4d4;}
   .fbook b{color:var(--muted);font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;}

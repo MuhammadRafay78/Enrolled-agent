@@ -21,9 +21,12 @@ function scrollToEl(el){
 }
 function tableHTML(t){
   var rows=t.split('\n').map(function(r){return r.split(' | ');});
-  var h='<table class="ntable">';
-  rows.forEach(function(cells,ri){
-    h+='<tr>'+cells.map(function(c){return ri===0?'<th>'+esc(c)+'</th>':'<td>'+esc(c)+'</td>';}).join('')+'</tr>';
+  var headers=rows[0]||[];
+  var h='<table class="ntable"><tr>'+headers.map(function(c){return '<th>'+esc(c)+'</th>';}).join('')+'</tr>';
+  rows.slice(1).forEach(function(cells){
+    // data-label feeds the narrow-screen layout (styles.css), where each row
+    // collapses into a labeled card instead of columns too thin to read.
+    h+='<tr>'+cells.map(function(c,ci){return '<td data-label="'+esc(headers[ci]||'')+'">'+esc(c)+'</td>';}).join('')+'</tr>';
   });
   return h+'</table>';
 }
@@ -194,9 +197,9 @@ function showNotes(n,backFn){
   h+='<button type="button" class="nh sechead" id="forms" data-secn="forms"><span>📄 Forms in this chapter</span><span class="chev">'+(formsOpen?'▾':'▸')+'</span></button>';
   h+='<div class="secbody" id="secbody-forms" style="display:'+(formsOpen?'block':'none')+'">';
   if(u.f.length){
-    h+='<table class="ntable"><tr><th style="width:132px">Form</th><th>Official title</th><th>What it is for</th></tr>';
+    h+='<table class="ntable"><tr><th class="form-col">Form</th><th>Official title</th><th>What it is for</th></tr>';
     u.f.forEach(function(f){
-      h+='<tr><td><b>'+esc(f.f)+'</b></td><td>'+esc(f.ttl||'')+'</td><td>'+esc(f.t)+
+      h+='<tr><td class="form-col" data-label="Form"><b>'+esc(f.f)+'</b></td><td data-label="Official title">'+esc(f.ttl||'')+'</td><td data-label="What it is for">'+esc(f.t)+
          (f.bk?'<div class="fbook"><b>From the book:</b> '+esc(f.bk)+(f.bksec?'<span class="nsrc"> '+esc(f.bksec)+'</span>':'')+'</div>':'')+
          '</td></tr>';
     });
@@ -305,7 +308,7 @@ function showNotes(n,backFn){
         hits.push({sec:s.t,k:'sec',t:(s.i[0]?s.i[0][1]:''),jump:si});
       }
       s.i.forEach(function(p){
-        if(hits.length>=30)return;
+        if(hits.length>=30||p[0]==='table')return; // raw pipe-delimited table rows read as garbage in a one-line snippet
         if(p[1].toLowerCase().indexOf(q)>=0)hits.push({sec:s.t,k:p[0],t:p[1],jump:si});
       });
     });
@@ -417,9 +420,9 @@ function chapterBlockHTML(n){
   h+='<h3 class="nh">🧭 Chapter summary</h3>'+chapterSummaryHTML(u);
   h+='<h3 class="nh">📄 Forms in this chapter</h3>';
   if(u.f.length){
-    h+='<table class="ntable"><tr><th style="width:132px">Form</th><th>Official title</th><th>What it is for</th></tr>';
+    h+='<table class="ntable"><tr><th class="form-col">Form</th><th>Official title</th><th>What it is for</th></tr>';
     u.f.forEach(function(f){
-      h+='<tr><td><b>'+esc(f.f)+'</b></td><td>'+esc(f.ttl||'')+'</td><td>'+esc(f.t)+
+      h+='<tr><td class="form-col" data-label="Form"><b>'+esc(f.f)+'</b></td><td data-label="Official title">'+esc(f.ttl||'')+'</td><td data-label="What it is for">'+esc(f.t)+
          (f.bk?'<div class="fbook"><b>From the book:</b> '+esc(f.bk)+(f.bksec?'<span class="nsrc"> '+esc(f.bksec)+'</span>':'')+'</div>':'')+
          '</td></tr>';
     });
@@ -579,7 +582,7 @@ function showNotesBook(startUnit){
         if(hits.length>=40)return;
         if(s.t.toLowerCase().indexOf(q)>=0)hits.push({unit:n,sec:si,title:s.t,snippet:(s.i[0]?s.i[0][1]:'')});
         s.i.forEach(function(p){
-          if(hits.length>=40)return;
+          if(hits.length>=40||p[0]==='table')return; // raw pipe-delimited table rows read as garbage in a one-line snippet
           if(p[1].toLowerCase().indexOf(q)>=0)hits.push({unit:n,sec:si,title:s.t,snippet:p[1]});
         });
       });
