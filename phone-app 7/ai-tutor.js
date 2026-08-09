@@ -181,7 +181,30 @@
   const ADD_TO_LIST_RE = /\b(add|save|put)\b.{0,60}\b(my\s+)?(study\s+)?list\b|\bmaster\s+(this\s+)?later\b|\b(need|have)\s+to\s+(re[- ]?study|master|review)\s+this\s+later\b|\bremember\s+this\s+for\s+later\b/i;
   function _looksLikeAddToList(msg){ return ADD_TO_LIST_RE.test(msg); }
   function _loadStudyList(){
-    try{ const v = JSON.parse(localStorage.getItem(STUDY_LIST_KEY)); return Array.isArray(v) ? v : []; }catch(e){ return []; }
+    try{
+      const v = JSON.parse(localStorage.getItem(STUDY_LIST_KEY));
+      let list = Array.isArray(v) ? v : [];
+      // One-time self-heal for entries saved by older versions of addToStudyList,
+      // which (before the ref-dedup and 3-ref cap existed) could save the same book
+      // section twice back-to-back, or more than 3 refs — including irrelevant ones
+      // pulled in by a too-vague note. Idempotent: a no-op once an entry is clean.
+      let changed = false;
+      list = list.map(e => {
+        if (!Array.isArray(e.refs) || e.refs.length <= 1) return e;
+        const seen = new Set();
+        const deduped = e.refs.filter(r => {
+          const key = r.chNum + '::' + r.sec;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        const trimmed = deduped.slice(0, 3);
+        if (trimmed.length !== e.refs.length) { changed = true; return Object.assign({}, e, { refs: trimmed }); }
+        return e;
+      });
+      if (changed) _saveStudyList(list);
+      return list;
+    }catch(e){ return []; }
   }
   function _saveStudyList(list){
     try{
