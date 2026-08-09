@@ -273,8 +273,11 @@
   .mhead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:16px;flex-wrap:wrap;}
   .mtitle{font-size:26px;font-weight:800;line-height:1.15;}
   .msub{font-size:13px;color:var(--muted);margin-top:2px;}
-  .mpill{font-size:12px;border:1px solid var(--border);border-radius:16px;padding:4px 11px;color:var(--muted);background:var(--card);cursor:pointer;font-family:inherit;}
+  .mpill{font-size:12px;border:1px solid var(--border);border-radius:16px;padding:4px 11px;color:var(--muted);background:var(--card);cursor:pointer;font-family:inherit;transition:transform .1s,border-color .15s,color .15s;}
   .mpill:hover{border-color:var(--blue);color:var(--blue);}
+  .mpill:active{transform:scale(.95);}
+  .mpill:disabled{cursor:default;}
+  .mpill:disabled:active{transform:none;}
   .mstats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:20px;}
   .mstat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:11px 13px;}
   .mstat .lbl{font-size:12px;color:var(--muted);}
@@ -316,7 +319,7 @@
   .mgrid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:20px;}
   .mgrid4{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px;}
   /* Flashcard mode — Brainscape style */
-  .fc-wrap{max-width:640px;margin:0 auto;padding:20px 0;}
+  .fc-wrap{max-width:640px;margin:0 auto;padding:20px 0;perspective:1200px;}
   .fc-topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;gap:12px;font-size:13px;color:var(--muted);}
   .fc-mastery{display:flex;align-items:center;gap:8px;}
   .fc-mastery-bar{width:100px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
@@ -325,6 +328,15 @@
   .fc-card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(180deg,var(--blue),#7c3aed);}
   .fc-card.back::before{background:linear-gradient(180deg,#22c55e,#0ea5e9);}
   .fc-card:active{transform:scale(.99);}
+  /* Reveal plays as a quick edge-on flip: the card animates out to 90deg
+     (invisible), JS swaps the front/back content at that instant, then the
+     freshly-rendered card animates back in from -90deg. See revealCard() in
+     flashcards.js for why it's a two-phase swap rather than a real
+     simultaneous dual-face 3D flip. */
+  @keyframes fcFlipOut{ to{transform:rotateY(90deg);opacity:0;} }
+  @keyframes fcFlipIn{ from{transform:rotateY(-90deg);opacity:0;} to{transform:rotateY(0deg);opacity:1;} }
+  .fc-card.fc-flip-out{animation:fcFlipOut .15s ease-in forwards;}
+  .fc-card.fc-flip-in{animation:fcFlipIn .18s ease-out;}
   .fc-label{font-size:10px;font-weight:800;letter-spacing:2px;text-transform:uppercase;color:var(--muted);margin-bottom:20px;}
   .fc-card.back .fc-label{color:#22c55e;}
   .fc-q{font-size:18px;line-height:1.6;color:var(--ink);max-width:100%;word-wrap:break-word;}
@@ -337,6 +349,7 @@
   .fc-rate button{padding:14px 4px 10px;border:2px solid var(--border);background:var(--card);border-radius:12px;font-family:inherit;font-size:20px;font-weight:700;cursor:pointer;transition:all .15s;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:3px;}
   .fc-rate button small{font-size:10px;font-weight:500;color:var(--muted);letter-spacing:.3px;}
   .fc-rate button:hover{transform:translateY(-2px);}
+  .fc-rate button:active{transform:scale(.94);}
   .fc-r1{border-color:#ef4444 !important;} .fc-r1:hover{background:rgba(239,68,68,.1);}
   .fc-r2{border-color:#f97316 !important;} .fc-r2:hover{background:rgba(249,115,22,.1);}
   .fc-r3{border-color:#eab308 !important;} .fc-r3:hover{background:rgba(234,179,8,.1);}
@@ -353,6 +366,16 @@
     .fc-rate button{padding:10px 2px 8px;font-size:18px;}
     .fc-rate button small{font-size:9px;}
   }
+  /* Flashcard browse mode — every card in a chapter, tap to flip in place */
+  .fc-browse-wrap{max-width:720px;margin:0 auto;}
+  .fc-browse-hd{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  .fc-brcard{border:1px solid var(--border);border-radius:12px;background:var(--card);margin-bottom:8px;cursor:pointer;overflow:hidden;transition:border-color .15s;}
+  .fc-brcard:hover{border-color:var(--blue);}
+  .fc-brfront{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:13px 16px;font-size:14.5px;color:var(--ink);}
+  .fc-brrating{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--green);background:var(--green-bg);border-radius:10px;padding:2px 8px;}
+  .fc-brback{max-height:0;overflow:hidden;padding:0 16px;font-size:14px;line-height:1.6;color:var(--muted);background:var(--bg);transition:max-height .25s ease,padding .25s ease;}
+  .fc-brcard.open .fc-brback{max-height:600px;padding:14px 16px 16px;}
+  .fc-brcard.open{border-color:var(--blue);}
   .mcard{position:relative;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px 15px;cursor:pointer;text-align:left;font-family:inherit;color:var(--ink);width:100%;display:block;}
   .mcard:hover{border-color:var(--blue);}
   .mcard .row1{display:flex;justify-content:space-between;align-items:baseline;gap:8px;}
