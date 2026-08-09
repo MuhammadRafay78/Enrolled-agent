@@ -53,37 +53,96 @@ function notesIndex(n){
 // first one: many of these paragraphs open with a short throat-clearing
 // sentence ("The rules are different for Roth IRA distributions.") with the
 // actual substance in the sentence right after it, so stopping at sentence 1
-// unconditionally produced vacuous gists. Keeps adding sentences until the
-// gist is substantial (~90 chars) or it has two, whichever comes first.
+// unconditionally produced vacuous gists. Keeps adding whole sentences until
+// the gist is substantial (~90 chars) or it has two, whichever comes first —
+// and never adds a sentence that would need to be cut in half to fit maxLen;
+// a fragment can flip or lose meaning, a short-but-complete gist can't.
+// Footnote markers glued straight onto the period (e.g. "...income.177") hide
+// the real sentence boundary — used both when checking whether text looks
+// like a real sentence and when splitting it, so a footnoted ending doesn't
+// get mistaken for "no terminal punctuation" in one place and stripped in
+// the other.
+function _stripFootnoteMarkers(text){
+  return String(text||'').replace(/([a-zA-Z%\)])\.(\d{1,3})(?=\s|$)/g,'$1.');
+}
 function _leadSentences(text,maxLen){
-  var t=String(text||'').trim();
-  // Footnote markers glued straight onto the period (e.g. "...income.177")
-  // hid the real sentence boundary from the regex below — strip them first.
-  t=t.replace(/([a-zA-Z%\)])\.(\d{1,3})(?=\s|$)/g,'$1.');
-  var re=/[^.!?]*[.!?]+(?=\s|$)/g, m, sentences=[], usedLen=0;
-  while((m=re.exec(t))){
+  var t=_stripFootnoteMarkers(text).trim();
+  // Abbreviations like "U.S." or "I.R.S." are internal periods with no
+  // trailing space, which the boundary regex below can't tell apart from a
+  // real sentence end otherwise — it would match nothing at the true start
+  // and resync mid-word, producing garbage like "S. S.". Temporarily swap
+  // those periods for a placeholder so they can't be mistaken for a
+  // boundary, then restore them in each extracted piece afterward.
+  var PH='\u0001';
+  var hasAbbr=/\b(?:[A-Za-z]\.){2,}/.test(t);
+  var work=hasAbbr?t.replace(/\b(?:[A-Za-z]\.){2,}/g,function(m){return m.split('.').join(PH);}):t;
+  var re=/[^.!?]*[.!?]+(?=\s|$)/g, m, sentences=[];
+  while((m=re.exec(work))){
     var piece=m[0].trim();
     if(!piece)continue;
+    if(hasAbbr)piece=piece.split(PH).join('.');
     sentences.push(piece);
-    usedLen+=piece.length;
-    if(usedLen>=90||sentences.length>=2)break;
+    if(sentences.length>=3)break; // hard stop regardless of length
   }
-  var out=sentences.length?sentences.join(' '):t;
-  if(out.length>maxLen){
-    var cut=out.lastIndexOf(', ',maxLen);
-    if(cut<maxLen*0.5)cut=out.lastIndexOf(' ',maxLen);
-    out=out.slice(0,cut>0?cut:maxLen).replace(/[,;:]+$/,'')+'…';
+  if(!sentences.length) return t.length>maxLen ? _clipToBoundary(t,maxLen) : t;
+  var out='';
+  for(var i=0;i<sentences.length;i++){
+    var candidate=out?out+' '+sentences[i]:sentences[i];
+    if(candidate.length>maxLen){
+      // A leftover fragment (e.g. "2025." — the tail of a sentence a source
+      // "rule" entry got split at) is too thin to strand as the whole gist,
+      // even though it's technically a complete match on its own — extend
+      // into the next sentence via clipping rather than returning it alone.
+      // Once we already have something substantial, stop instead of cutting it.
+      if(out.length<30) return _clipToBoundary(candidate,maxLen);
+      break;
+    }
+    out=candidate;
+    if(out.length>=90)break;
   }
   return out;
+}
+function _clipToBoundary(s,maxLen){
+  var cut=s.lastIndexOf(', ',maxLen);
+  if(cut<maxLen*0.5)cut=s.lastIndexOf(' ',maxLen);
+  return s.slice(0,cut>0?cut:maxLen).replace(/[,;:]+$/,'')+'…';
+}
+// Book-extraction artifacts sometimes leave a bare label or heading fragment
+// ("Study Unit", "4", "More Reading:", "Exam Note") tagged the same as real
+// body text, or split one real sentence across two "rule" entries at a
+// comma ("...after July 4," / "2025."). Validating the EXTRACTED gist
+// (rather than pre-checking the raw candidate's own ending) means a real
+// sentence that's simply followed by a colon-introduced list — "IRS Written
+// Determinations are ... open to public inspection. There are many types
+// ..., including:" — still gets recognized, since _leadSentences already
+// stops at the first complete, substantial sentence and never reaches the
+// colon. A genuine result ends in . ! or … (optionally inside a closing
+// quote/paren), starts with a capital letter/digit/quote — not lowercase,
+// which marks a continuation fragment like "child has)." — and runs longer
+// than a stray leftover. A colon ending is also accepted, but only once
+// it's substantial (40+ chars): a real "...allow expensing in specific
+// instances:" lead-in is worth showing even without its list, but a bare
+// "More Reading:" label is not — length is what tells them apart.
+function _isUsableGist(g){
+  if(!g||g.length<20)return false;
+  if(!/[.!?…]["'”’)]*$/.test(g) && !(g.length>=40 && /:$/.test(g)))return false;
+  var firstChar=g.replace(/^["'“‘(]+/,'').charAt(0);
+  if(/[a-z]/.test(firstChar))return false;
+  return true;
 }
 function _sectionGist(s){
   for(var j=0;j<s.i.length;j++){
     var kind=s.i[j][0];
     if(kind==='li'||kind==='table'||kind==='ex')continue;
-    return _leadSentences(s.i[j][1],200);
+    var candidate=_leadSentences(s.i[j][1],200);
+    if(_isUsableGist(candidate))return candidate;
   }
-  var firstLi=s.i.filter(function(p){return p[0]==='li';})[0];
-  return firstLi?_leadSentences(firstLi[1],200):'';
+  for(var k=0;k<s.i.length;k++){
+    if(s.i[k][0]!=='li')continue;
+    var liCandidate=_leadSentences(s.i[k][1],200);
+    if(_isUsableGist(liCandidate))return liCandidate;
+  }
+  return '';
 }
 // Bolds $ amounts and % rates so the thresholds jump out at a skim — the rest
 // of the key-number sentence stays as-is, nothing is trimmed or reworded.
