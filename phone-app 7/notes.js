@@ -58,6 +58,11 @@ function showNotes(n,backFn){
   var h='<div class="nsearchwrap"><input class="nsearch" id="noteSearch" placeholder="🔍 Search chapter"></div>'+
     '<div class="nhead"><div class="nhead-t"><h2 style="margin:0 0 2px;padding-right:210px">SU '+n+': '+esc(u.t)+'</h2>'+
     '<p style="color:var(--muted);font-size:13px;margin:0">Complete notes from your '+PARTS[PART].name+' study guide — forms, thresholds, rules'+(u.ex?', and worked examples':'')+'.</p></div></div><div id="noteRes"></div>';
+  // flashcards launcher — one card per form and per key-number/threshold in this chapter
+  var fcCount=(typeof chapterCardCount==='function')?chapterCardCount(n):0;
+  if(fcCount){
+    h+='<button type="button" class="fcstart" id="chapterFcBtn"><span class="fcstart-ico">🧠</span><span class="fcstart-t"><b>Flashcards for this chapter</b><br><span style="color:var(--muted);font-size:12.5px">Forms, key numbers &amp; deadlines — '+fcCount+' card'+(fcCount===1?'':'s')+'</span></span><span class="fcstart-go">→</span></button>';
+  }
   // forms
   var formsOpen=notesSecOpen(n,'forms');
   h+='<button type="button" class="nh sechead" id="forms" data-secn="forms"><span>📄 Forms in this chapter</span><span class="chev">'+(formsOpen?'▾':'▸')+'</span></button>';
@@ -106,6 +111,8 @@ function showNotes(n,backFn){
   h+='<div class="nav2"><button class="navbtn" id="notesBack2">← Back</button><span></span></div>';
   card.innerHTML=h;
   wireBookq(n);
+  var fcBtn=document.getElementById('chapterFcBtn');
+  if(fcBtn)fcBtn.onclick=function(){ startChapterFlashcards(n); };
   var back=function(){ if(NOTEBACK){var f=NOTEBACK;NOTEBACK=null;f();} else showMenu(); };
   document.getElementById('notesBack2').onclick=back;
   setFloatBack(back,'← Back');
