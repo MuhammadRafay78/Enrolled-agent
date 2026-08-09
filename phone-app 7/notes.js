@@ -320,6 +320,282 @@ function showNotes(n,backFn){
     if(x)x.onclick=function(){ns.value='';box.innerHTML='';};
   };
 }
+// ============================================================================
+// ==== CHAPTER NOTES: continuous "book" scroll (all chapters, one page)
+// ============================================================================
+// Reading mode: chapters render fully expanded (no per-section accordions —
+// the point is nothing to click), one after another, with the next chapter
+// appended automatically as you scroll near the bottom. Bookq/flashcard ids
+// from the single-chapter view (showNotes) aren't safe to reuse verbatim
+// here since multiple chapters now share one DOM — every id below is
+// namespaced with the unit number so chapters can coexist without colliding.
+var BOOK_IO=null, BOOK_HDIO=null;
+// Reading-progress bar: how far down the whole book you are, not just this
+// chapter. Self-guarding on #chbkWrap so it's a no-op outside book view —
+// no separate teardown needed when the user navigates away.
+window.addEventListener('scroll',function(){
+  if(!document.getElementById('chbkWrap'))return;
+  var doc=document.documentElement;
+  var max=doc.scrollHeight-window.innerHeight;
+  var pct=max>0?Math.min(100,Math.max(0,(window.pageYOffset||doc.scrollTop||0)/max*100)):0;
+  var prog=document.getElementById('prog');
+  if(prog)prog.style.width=pct+'%';
+},{passive:true});
+function chapterUnitOrder(){
+  return Object.keys(CHNOTES[PART]).sort(function(a,b){return a-b;});
+}
+// Same question/answer UI as bookqHTML/wireBookq (study-tools.js), but every
+// id carries the unit so answering chapter 5's Q2 can't touch chapter 2's Q2.
+function bookqHTMLScoped(n){
+  var B=BOOKQ[PART]; if(!B||!B[n]||!B[n].length)return '';
+  var qs=B[n], st=bqState(), done=0, right=0;
+  qs.forEach(function(q,i){var v=st[n+':'+i]; if(v!==undefined&&v!==null){done++; if(v===q.a)right++;}});
+  var h='<h3 class="nh" id="bookq-'+n+'">📝 Study Questions <span style="font-weight:400;color:var(--muted);font-size:13px">('+qs.length+' from this chapter'+(done?' · '+right+'/'+done+' correct':'')+')</span></h3>';
+  h+='<p style="color:var(--muted);font-size:13px;margin:0 0 12px">Pick an answer and the book’s explanation appears underneath. <a href="#" class="bqReset" data-n="'+n+'">Reset answers</a></p>';
+  var L=['A','B','C','D'];
+  qs.forEach(function(q,i){
+    var sel=st[n+':'+i]; var answered=(sel!==undefined&&sel!==null);
+    h+='<div class="bq" id="bq-'+n+'-'+i+'"><div class="bqq"><span class="bqn">'+(i+1)+'.</span> '+esc(q.q)+'</div>';
+    h+='<div class="bqopts">';
+    q.opts.forEach(function(o,j){
+      var cls='bqopt';
+      if(answered){ if(j===q.a)cls+=' correct'; else if(j===sel)cls+=' wrong'; else cls+=' dim'; }
+      h+='<button class="'+cls+'" data-bqn="'+n+'" data-bq="'+i+'" data-opt="'+j+'"'+(answered?' disabled':'')+'><b>'+L[j]+'.</b> '+esc(o)+'</button>';
+    });
+    h+='</div>';
+    h+='<div class="bqans" id="bqans-'+n+'-'+i+'"'+(answered?'':' style="display:none"')+'>';
+    if(answered){
+      h+='<div class="bqverdict '+(sel===q.a?'ok':'no')+'">'+(sel===q.a?'✓ Correct':'✗ Incorrect — the answer is '+L[q.a])+'</div><div class="why">'+fmtExpl(q.expl)+'</div>';
+    }
+    h+='</div></div>';
+  });
+  return h;
+}
+function wireBookqScoped(n,root){
+  var B=BOOKQ[PART]; if(!B||!B[n])return;
+  var qs=B[n], L=['A','B','C','D'];
+  root.querySelectorAll('[data-bqn="'+n+'"]').forEach(function(b){
+    b.onclick=function(){
+      var i=+b.dataset.bq, j=+b.dataset.opt, q=qs[i];
+      var s=bqState(); s[n+':'+i]=j; bqSave(s);
+      var wrap=document.getElementById('bq-'+n+'-'+i);
+      wrap.querySelectorAll('.bqopt').forEach(function(o,k){
+        o.disabled=true; o.classList.remove('correct','wrong','dim');
+        if(k===q.a)o.classList.add('correct'); else if(k===j)o.classList.add('wrong'); else o.classList.add('dim');
+      });
+      var ans=document.getElementById('bqans-'+n+'-'+i);
+      ans.innerHTML='<div class="bqverdict '+(j===q.a?'ok':'no')+'">'+(j===q.a?'✓ Correct':'✗ Incorrect — the answer is '+L[q.a])+'</div><p>'+esc(q.expl)+'</p>';
+      ans.style.display='block';
+      var hdr=document.querySelector('#bookq-'+n+' span');
+      if(hdr){
+        var st2=bqState(),d=0,r=0;
+        qs.forEach(function(qq,ii){var v=st2[n+':'+ii];if(v!==undefined&&v!==null){d++;if(v===qq.a)r++;}});
+        hdr.textContent='('+qs.length+' from this chapter'+(d?' · '+r+'/'+d+' correct':'')+')';
+      }
+    };
+  });
+  root.querySelectorAll('.bqReset[data-n="'+n+'"]').forEach(function(rs){
+    rs.onclick=function(e){
+      e.preventDefault();
+      var s=bqState();
+      Object.keys(s).forEach(function(k){if(k.indexOf(n+':')===0)delete s[k];});
+      bqSave(s);
+      var mount=document.getElementById('bookqwrap-'+n);
+      if(mount){ mount.innerHTML=bookqHTMLScoped(n); wireBookqScoped(n,mount); }
+    };
+  });
+}
+function chapterBlockHTML(n){
+  var u=CHNOTES[PART][n];
+  var h='<section class="chbk" id="chbk-'+n+'" data-unit="'+n+'">';
+  h+='<div class="chbk-hd" data-hd="'+n+'"><h2 style="margin:0 0 2px">SU '+n+': '+esc(u.t)+'</h2>'+
+     '<p style="color:var(--muted);font-size:13px;margin:0">Complete notes from your '+PARTS[PART].name+' study guide — forms, thresholds, rules'+(u.ex?', and worked examples':'')+'.</p></div>';
+  var fcCount=(typeof chapterCardCount==='function')?chapterCardCount(n):0;
+  if(fcCount){
+    h+='<button type="button" class="fcstart" data-fcunit="'+n+'"><span class="fcstart-ico">🧠</span><span class="fcstart-t"><b>Flashcards for this chapter</b><br><span style="color:var(--muted);font-size:12.5px">Forms, key numbers &amp; deadlines — '+fcCount+' card'+(fcCount===1?'':'s')+'</span></span><span class="fcstart-go">→</span></button>';
+  }
+  h+='<h3 class="nh">🧭 Chapter summary</h3>'+chapterSummaryHTML(u);
+  h+='<h3 class="nh">📄 Forms in this chapter</h3>';
+  if(u.f.length){
+    h+='<table class="ntable"><tr><th style="width:132px">Form</th><th>Official title</th><th>What it is for</th></tr>';
+    u.f.forEach(function(f){
+      h+='<tr><td><b>'+esc(f.f)+'</b></td><td>'+esc(f.ttl||'')+'</td><td>'+esc(f.t)+
+         (f.bk?'<div class="fbook"><b>From the book:</b> '+esc(f.bk)+(f.bksec?'<span class="nsrc"> '+esc(f.bksec)+'</span>':'')+'</div>':'')+
+         '</td></tr>';
+    });
+    h+='</table>';
+  } else h+='<p style="color:var(--muted)">No forms referenced in this chapter.</p>';
+  h+='<h3 class="nh">🔢 Key numbers, thresholds &amp; deadlines</h3>';
+  if(u.k.length){
+    h+='<ul class="nlist">'+u.k.map(function(x){return '<li>'+esc(x.t)+'<div class="nsrc">'+esc(x.sec)+'</div></li>';}).join('')+'</ul>';
+  } else h+='<p style="color:var(--muted)">No specific thresholds listed in this chapter.</p>';
+  h+='<h3 class="nh">📚 Detailed notes</h3>';
+  u.s.forEach(function(s,i){
+    h+='<div class="nsec" id="chbk-'+n+'-s'+i+'"><div class="'+(s.l===3?'nsub':'nsec-h')+'">'+esc(s.t)+'</div>';
+    var exBuf=[];
+    function flushEx(){
+      if(!exBuf.length)return;
+      h+='<details class="nex"><summary>Example — tap to work through it</summary>'+exBuf.map(function(t){return '<p>'+esc(t)+'</p>';}).join('')+'</details>';
+      exBuf=[];
+    }
+    s.i.forEach(function(pair){
+      var k=pair[0],t=pair[1];
+      if(k==='ex'){exBuf.push(t);return;}
+      flushEx();
+      if(k==='table')h+=tableHTML(t);
+      else if(k==='li')h+='<ul class="nlist"><li>'+esc(t)+'</li></ul>';
+      else if(k==='note')h+='<p class="nnote">'+esc(t)+'</p>';
+      else h+='<p>'+esc(t)+'</p>';
+    });
+    flushEx();
+    h+='</div>';
+  });
+  h+='<div id="bookqwrap-'+n+'">'+bookqHTMLScoped(n)+'</div>';
+  h+='</section><div class="chbk-div"><span>End of Study Unit '+n+'</span></div>';
+  return h;
+}
+function wireChapterBlock(n){
+  var root=document.getElementById('chbk-'+n);
+  if(!root)return;
+  var fcBtn=root.querySelector('[data-fcunit="'+n+'"]');
+  if(fcBtn)fcBtn.onclick=function(){ startChapterFlashcards(n,function(){ showNotesBook(n); }); };
+  wireBookqScoped(n,root);
+}
+function notesBookIndex(order,activeUnit){
+  var C=CHNOTES[PART];
+  var h='<button class="side-close" id="sideClose">✕ Close</button><div class="side-hd">'+PARTS[PART].name+' — Chapters</div>';
+  order.forEach(function(n){
+    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+'" data-jumpchapter="'+n+'">SU '+n+': '+esc(C[n].t)+'</button>';
+  });
+  h+='<button class="side-btn" id="notesBookBack" style="margin-top:10px">← Chapter list</button>';
+  return h;
+}
+function showNotesBook(startUnit){
+  startUnit=String(startUnit);
+  var C=CHNOTES[PART];
+  if(!C||!C[startUnit]){ notesUnitList(); return; }
+  stopTimer();stopClock();
+  var order=chapterUnitOrder();
+  var startIdx=order.indexOf(startUnit); if(startIdx<0)startIdx=0;
+  markView('notesbook',{unit:startUnit});
+  side.classList.add('active');side.classList.remove('open');document.body.classList.add('inquiz');
+  document.getElementById('counter').textContent='SU '+startUnit+': '+C[startUnit].t+' — Chapter Notes';
+  document.getElementById('score').textContent='Study guide';
+  document.getElementById('prog').style.width='0%';
+  var h='<p style="color:var(--muted);font-size:13px;margin:0 0 10px">Scroll down for the next chapter — every chapter in '+esc(PARTS[PART].name)+' follows in order, no need to go back.</p>';
+  h+='<div class="nsearchwrap" style="position:static;height:auto;justify-content:stretch;margin-bottom:14px"><input class="nsearch" id="bookSearch" style="width:100%" placeholder="🔍 Search all of '+esc(PARTS[PART].name)+'"></div><div id="bookSearchRes"></div>';
+  h+='<div class="chbk-wrap" id="chbkWrap">'+chapterBlockHTML(startUnit)+'</div>';
+  h+='<div class="chbk-sentinel" id="chbkSentinel"></div><div class="chbk-loading" id="chbkLoading" style="display:none"></div>';
+  h+='<div class="nav2"><button class="navbtn" id="chbkBack">← Chapter list</button><span></span></div>';
+  card.innerHTML=h;
+  var back=function(){ notesUnitList(); };
+  document.getElementById('chbkBack').onclick=back;
+  setFloatBack(back,'← Chapter list');
+  side.innerHTML=notesBookIndex(order,startUnit);
+  wireChapterBlock(startUnit);
+
+  // Re-observing after appending chapters fires an "initial state" callback
+  // reflecting wherever the page is scrolled *right now* — which, for a jump
+  // to a specific section (search results land mid-chapter, not on the
+  // chapter's own heading), is still the pre-jump position at the instant
+  // ensureLoadedThrough() runs, before the smooth scroll has moved anything.
+  // That stale callback would otherwise race the explicit header update in
+  // goToBookTarget() and win, snapping the header back to the old chapter.
+  // Suppressing observer-driven updates for a beat after an explicit jump
+  // lets the explicit update stand until the scroll (and real tracking) catches up.
+  var lastJumpAt=0;
+  function observeHeadings(){
+    if(BOOK_HDIO)BOOK_HDIO.disconnect();
+    BOOK_HDIO=new IntersectionObserver(function(entries){
+      if(Date.now()-lastJumpAt<800)return;
+      entries.forEach(function(e){
+        if(!e.isIntersecting)return;
+        var n=e.target.dataset.hd;
+        document.getElementById('counter').textContent='SU '+n+': '+C[n].t+' — Chapter Notes';
+        side.querySelectorAll('[data-jumpchapter]').forEach(function(b){b.classList.toggle('on',b.dataset.jumpchapter===n);});
+      });
+    // Top-anchored band, not centered: a heading scrolled to the top of the
+    // viewport (natural reading, or a scrollIntoView({block:'start'}) jump)
+    // both land inside it, so "current chapter" tracks either kind of move.
+    },{rootMargin:'0px 0px -75% 0px'});
+    document.querySelectorAll('[data-hd]').forEach(function(el){BOOK_HDIO.observe(el);});
+  }
+  observeHeadings();
+
+  var loadedIdx=startIdx;
+  // Appends chapters in order up through (and including) targetIdx — used both
+  // by the infinite-scroll sentinel (one chapter at a time) and by search
+  // jumping straight to a match in a chapter that hasn't scrolled into view yet.
+  function ensureLoadedThrough(targetIdx){
+    var wrap=document.getElementById('chbkWrap');
+    while(loadedIdx<targetIdx&&loadedIdx<order.length-1){
+      loadedIdx++;
+      var nextN=order[loadedIdx];
+      var tmp=document.createElement('div');
+      tmp.innerHTML=chapterBlockHTML(nextN);
+      while(tmp.firstChild)wrap.appendChild(tmp.firstChild);
+      wireChapterBlock(nextN);
+    }
+    observeHeadings();
+    if(loadedIdx>=order.length-1){
+      if(BOOK_IO){BOOK_IO.disconnect();BOOK_IO=null;}
+      var loading=document.getElementById('chbkLoading');
+      if(loading){loading.style.display='block';loading.textContent='— End of '+PARTS[PART].name+' chapter notes —';}
+    }
+  }
+  if(BOOK_IO)BOOK_IO.disconnect();
+  BOOK_IO=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting)ensureLoadedThrough(loadedIdx+1); });
+  },{rootMargin:'800px 0px 800px 0px'});
+  BOOK_IO.observe(document.getElementById('chbkSentinel'));
+
+  // Jump to a specific chapter (and, if given, one of its sections), loading
+  // whatever chapters between here and there haven't been appended yet. A
+  // chapter before the book's start unit was never (and won't be) loaded
+  // forward, so land there by restarting the book at that earlier chapter.
+  function goToBookTarget(n,secIdx){
+    var idx=order.indexOf(n);
+    if(idx<startIdx){ showNotesBook(n); return; }
+    lastJumpAt=Date.now();
+    ensureLoadedThrough(idx);
+    document.getElementById('counter').textContent='SU '+n+': '+C[n].t+' — Chapter Notes';
+    side.querySelectorAll('[data-jumpchapter]').forEach(function(x){x.classList.toggle('on',x.dataset.jumpchapter===n);});
+    var el=document.getElementById(secIdx!=null?('chbk-'+n+'-s'+secIdx):('chbk-'+n));
+    scrollToEl(el);
+  }
+  side.querySelectorAll('[data-jumpchapter]').forEach(function(b){
+    b.onclick=function(){ side.classList.remove('open'); goToBookTarget(b.dataset.jumpchapter,null); };
+  });
+  var sc=document.getElementById('sideClose'); if(sc)sc.onclick=function(){side.classList.remove('open');};
+  var bb=document.getElementById('notesBookBack'); if(bb)bb.onclick=function(){ notesUnitList(); };
+  var bsIn=document.getElementById('bookSearch'), bsBox=document.getElementById('bookSearchRes');
+  bsIn.oninput=function(){
+    var q=bsIn.value.trim().toLowerCase();
+    if(q.length<3){bsBox.innerHTML='';return;}
+    var hits=[];
+    order.forEach(function(n){
+      var u=C[n];
+      u.s.forEach(function(s,si){
+        if(hits.length>=40)return;
+        if(s.t.toLowerCase().indexOf(q)>=0)hits.push({unit:n,sec:si,title:s.t,snippet:(s.i[0]?s.i[0][1]:'')});
+        s.i.forEach(function(p){
+          if(hits.length>=40)return;
+          if(p[1].toLowerCase().indexOf(q)>=0)hits.push({unit:n,sec:si,title:s.t,snippet:p[1]});
+        });
+      });
+    });
+    bsBox.innerHTML=hits.length?('<div class="nres nresbox"><div style="font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between"><span>'+hits.length+' match'+(hits.length>1?'es':'')+' — click to jump</span><button id="bookSearchX" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px">✕</button></div>'+hits.map(function(x,i){
+      return '<div class="nresi" data-goidx="'+i+'"><b>SU '+x.unit+' · '+esc(x.title)+'</b><p>'+esc(x.snippet)+'</p></div>';
+    }).join('')+'</div>'):'<p style="color:var(--muted);font-size:13px">No matches.</p>';
+    bsBox.querySelectorAll('[data-goidx]').forEach(function(el){
+      el.style.cursor='pointer';
+      el.onclick=function(){ var x=hits[+el.dataset.goidx]; goToBookTarget(x.unit,x.sec); };
+    });
+    var xbtn=document.getElementById('bookSearchX');
+    if(xbtn)xbtn.onclick=function(){bsIn.value='';bsBox.innerHTML='';};
+  };
+  restoreScroll();
+}
 function notesUnitList(){
   markView('noteslist');
   setFloatBack(goBack,'← Back');
@@ -339,7 +615,7 @@ function notesUnitList(){
   });
   h+='<div class="nav2"><button class="navbtn" id="nulBack">← Exam Menu</button><span></span></div>';
   card.innerHTML=h;
-  card.querySelectorAll('[data-nu]').forEach(function(b){b.onclick=function(){showNotes(b.dataset.nu,notesUnitList);};});
+  card.querySelectorAll('[data-nu]').forEach(function(b){b.onclick=function(){showNotesBook(b.dataset.nu);};});
   document.getElementById('nulBack').onclick=showMenu;
 }
 
