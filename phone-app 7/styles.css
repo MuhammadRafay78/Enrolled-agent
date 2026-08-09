@@ -150,6 +150,16 @@
   button.nsec-h:hover,button.nsub:hover{opacity:.8;}
   button.nsec-h .chev,button.nsub .chev{color:var(--muted);font-size:12px;flex-shrink:0;}
   .nsec p{margin:0 0 8px;line-height:1.6;font-size:14.5px;}
+  /* Continuous "book" scroll — chapters run one after another; the divider
+     marks the boundary and the sentinel/loading row sit below the last one
+     while the next chapter is fetched into view. */
+  .chbk{margin-bottom:8px;}
+  .chbk-hd{margin:0 0 14px;padding-bottom:10px;border-bottom:2px solid var(--border);scroll-margin-top:14px;}
+  .chbk-hd h2{font-size:20px;}
+  .chbk-div{display:flex;align-items:center;gap:10px;margin:36px 0 30px;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;}
+  .chbk-div::before,.chbk-div::after{content:'';flex:1;height:1px;background:var(--border);}
+  .chbk-sentinel{height:1px;}
+  .chbk-loading{text-align:center;color:var(--muted);font-size:13px;padding:16px 0 26px;}
   /* Chapter summary list */
   .nsum-list{list-style:none;margin:0;padding:0;}
   .nsum-list>li{padding:10px 0;border-bottom:1px solid var(--border);font-size:14px;line-height:1.55;}

@@ -58,6 +58,7 @@ function navGo(v){
     else if(K==='noteslist' && typeof notesUnitList==='function') notesUnitList();
     else if(K==='dash' && typeof showDashboard==='function') showDashboard();
     else if(K==='notes' && typeof showNotes==='function' && v.unit!=null) showNotes(v.unit);
+    else if(K==='notesbook' && typeof showNotesBook==='function' && v.unit!=null) showNotesBook(v.unit);
     else if((K==='nums'||K==='dl') && typeof showSheet==='function') showSheet(K==='dl'?'dl':'nums', v.filt||'all');
     else if(K==='acct' && typeof acctScreen==='function') acctScreen();
     else if(K==='quiz'){
@@ -95,6 +96,7 @@ function restoreView(){
     selectPart(v.part);
     if(v.kind==='parts'){showParts();return;}
     if(v.kind==='menu'){showMenu();return;}
+    if(v.kind==='notesbook'&&CHNOTES[PART]&&CHNOTES[PART][v.unit]){showNotesBook(v.unit);return;}
     if(v.kind==='notes'&&CHNOTES[PART]&&CHNOTES[PART][v.unit]){showNotes(v.unit,notesUnitList);return;}
     if(v.kind==='noteslist'){notesUnitList();return;}
     if(v.kind==='mcqlist'&&MCQS.length){mcqChapterList();return;}
