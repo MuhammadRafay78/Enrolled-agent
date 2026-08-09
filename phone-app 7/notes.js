@@ -30,6 +30,7 @@ function tableHTML(t){
 function notesIndex(n){
   var u=CHNOTES[PART][n];
   var h='<button class="side-close" id="sideClose">✕ Close</button><div class="side-hd">SU '+n+' — Contents</div>';
+  h+='<button class="side-btn" data-jump="summary">🧭 Summary</button>';
   h+='<button class="side-btn" data-jump="forms">📄 Forms ('+u.f.length+')</button>';
   h+='<button class="side-btn" data-jump="nums">🔢 Key numbers ('+u.k.length+')</button>';
   if(BOOKQ[PART]&&BOOKQ[PART][n]&&BOOKQ[PART][n].length)
@@ -39,6 +40,53 @@ function notesIndex(n){
     h+='<button class="side-btn" data-jump="s'+i+'" style="text-align:left;font-size:12.5px;padding:7px 9px'+(s.l===3?';padding-left:18px':'')+'">'+esc(s.t)+'</button>';
   });
   h+='<button class="side-btn" id="notesBack" style="margin-top:10px">← Back</button>';
+  return h;
+}
+// ---- Chapter summary: one tight bullet per section, numbers preserved verbatim ----
+// Built mechanically from the same curated section/key-number data as the full
+// notes below — never AI-generated — so a $ threshold or % rate can't quietly
+// drift or go missing in the condensing. Each bullet is the section's own
+// first substantive sentence (skipping bare list items, which are rarely full
+// sentences) plus, verbatim, any Key Numbers entries already tagged to that
+// exact section title.
+function _firstSentence(text,maxLen){
+  var t=String(text||'').trim();
+  var m=t.match(/^[\s\S]*?[.!?](?=\s|$)/);
+  var s=m?m[0]:t;
+  if(s.length>maxLen){
+    s=s.slice(0,maxLen);
+    var lastSpace=s.lastIndexOf(' ');
+    if(lastSpace>maxLen*0.6)s=s.slice(0,lastSpace);
+    s=s.replace(/[,;:]+$/,'')+'…';
+  }
+  return s;
+}
+function _sectionGist(s){
+  for(var j=0;j<s.i.length;j++){
+    var kind=s.i[j][0];
+    if(kind==='li'||kind==='table'||kind==='ex')continue;
+    return _firstSentence(s.i[j][1],170);
+  }
+  var firstLi=s.i.filter(function(p){return p[0]==='li';})[0];
+  return firstLi?_firstSentence(firstLi[1],170):'';
+}
+// Bolds $ amounts and % rates so the thresholds jump out at a skim — the rest
+// of the key-number sentence stays as-is, nothing is trimmed or reworded.
+function _highlightNums(text){
+  return esc(text).replace(/\$[\d,]+(?:\.\d+)?|\b\d+(?:\.\d+)?%/g,function(m){return '<b>'+m+'</b>';});
+}
+function chapterSummaryHTML(u){
+  var byTitle={};
+  u.k.forEach(function(x){ (byTitle[x.sec]=byTitle[x.sec]||[]).push(x.t); });
+  var h='<p style="color:var(--muted);font-size:13px;margin-bottom:10px">A quick pass through every topic in this chapter, numbers included — the full notes below go deeper.</p><ul class="nsum-list">';
+  u.s.forEach(function(s){
+    var gist=_sectionGist(s);
+    var nums=byTitle[s.t]||[];
+    h+='<li'+(s.l===3?' class="nsum-sub"':'')+'><b>'+esc(s.t)+'</b>'+(gist?' — '+esc(gist):'')+
+       (nums.length?'<ul class="nsum-nums">'+nums.map(function(t){return '<li>'+_highlightNums(t)+'</li>';}).join('')+'</ul>':'')+
+       '</li>';
+  });
+  h+='</ul>';
   return h;
 }
 function showNotes(n,backFn){
@@ -63,6 +111,10 @@ function showNotes(n,backFn){
   if(fcCount){
     h+='<button type="button" class="fcstart" id="chapterFcBtn"><span class="fcstart-ico">🧠</span><span class="fcstart-t"><b>Flashcards for this chapter</b><br><span style="color:var(--muted);font-size:12.5px">Forms, key numbers &amp; deadlines — '+fcCount+' card'+(fcCount===1?'':'s')+'</span></span><span class="fcstart-go">→</span></button>';
   }
+  // summary
+  var summaryOpen=notesSecOpen(n,'summary');
+  h+='<button type="button" class="nh sechead" id="summary" data-secn="summary"><span>🧭 Chapter summary</span><span class="chev">'+(summaryOpen?'▾':'▸')+'</span></button>';
+  h+='<div class="secbody" id="secbody-summary" style="display:'+(summaryOpen?'block':'none')+'">'+chapterSummaryHTML(u)+'</div>';
   // forms
   var formsOpen=notesSecOpen(n,'forms');
   h+='<button type="button" class="nh sechead" id="forms" data-secn="forms"><span>📄 Forms in this chapter</span><span class="chev">'+(formsOpen?'▾':'▸')+'</span></button>';
@@ -85,10 +137,15 @@ function showNotes(n,backFn){
     h+='<ul class="nlist">'+u.k.map(function(x){return '<li>'+esc(x.t)+'<div class="nsrc">'+esc(x.sec)+'</div></li>';}).join('')+'</ul>';
   } else h+='<p style="color:var(--muted)">No specific thresholds listed in this chapter.</p>';
   h+='</div>';
-  // sections
-  h+='<h3 class="nh">📚 Detailed notes</h3>';
+  // sections — each one collapsible on its own (default open, same as Forms/Key
+  // numbers above), plus a bulk toggle since a chapter can run 30-40 sections.
+  var anyDetailOpen=u.s.some(function(s,i){return notesSecOpen(n,'s'+i);});
+  h+='<div class="nh" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>📚 Detailed notes</span>'+
+     '<button type="button" class="mpill" id="notesToggleAll" style="padding:4px 12px">'+(anyDetailOpen?'Collapse all':'Expand all')+'</button></div>';
   u.s.forEach(function(s,i){
-    h+='<div class="nsec" id="s'+i+'"><h4 class="'+(s.l===3?'nsub':'nsec-h')+'">'+esc(s.t)+'</h4>';
+    var open=notesSecOpen(n,'s'+i);
+    h+='<div class="nsec" id="s'+i+'"><button type="button" class="'+(s.l===3?'nsub':'nsec-h')+'" data-secn="s'+i+'"><span>'+esc(s.t)+'</span><span class="chev">'+(open?'▾':'▸')+'</span></button>';
+    h+='<div class="secbody" id="secbody-s'+i+'" style="display:'+(open?'block':'none')+'">';
     var exBuf=[];
     function flushEx(){
       if(!exBuf.length)return;
@@ -105,7 +162,7 @@ function showNotes(n,backFn){
       else h+='<p>'+esc(t)+'</p>';
     });
     flushEx();
-    h+='</div>';
+    h+='</div></div>';
   });
   h+=bookqHTML(n);
   h+='<div class="nav2"><button class="navbtn" id="notesBack2">← Back</button><span></span></div>';
@@ -126,23 +183,41 @@ function showNotes(n,backFn){
       var body=document.getElementById('secbody-'+key), chev=b.querySelector('.chev');
       if(body)body.style.display=open?'block':'none';
       if(chev)chev.textContent=open?'▾':'▸';
+      var toggleAll=document.getElementById('notesToggleAll');
+      if(toggleAll&&/^s\d+$/.test(key)){
+        var anyOpen=u.s.some(function(s,i){return notesSecOpen(n,'s'+i);});
+        toggleAll.textContent=anyOpen?'Collapse all':'Expand all';
+      }
     };
   });
+  var toggleAllBtn=document.getElementById('notesToggleAll');
+  if(toggleAllBtn)toggleAllBtn.onclick=function(){
+    var anyOpen=u.s.some(function(s,i){return notesSecOpen(n,'s'+i);});
+    var openTo=!anyOpen; // any open -> this click collapses everything; none open -> expands everything
+    u.s.forEach(function(s,i){
+      notesSecSetOpen(n,'s'+i,openTo);
+      var body=document.getElementById('secbody-s'+i), head=card.querySelector('[data-secn="s'+i+'"]');
+      if(body)body.style.display=openTo?'block':'none';
+      if(head){var chev=head.querySelector('.chev');if(chev)chev.textContent=openTo?'▾':'▸';}
+    });
+    toggleAllBtn.textContent=openTo?'Collapse all':'Expand all';
+  };
+  // Jumping to (or search-landing on) a collapsed section would show a header
+  // with nothing visible below it — auto-open whatever the target belongs to.
+  // Works uniformly for forms/nums/summary/detail sections since they all
+  // share the same sechead + secbody-KEY + notesSecOpen(n,KEY) shape.
+  function notesJumpTo(key){
+    var el=document.getElementById(key);
+    if(!notesSecOpen(n,key)){
+      notesSecSetOpen(n,key,true);
+      var body=document.getElementById('secbody-'+key);
+      if(body)body.style.display='block';
+      if(el){var chev=el.querySelector('.chev');if(chev)chev.textContent='▾';}
+    }
+    scrollToEl(el);
+  }
   side.querySelectorAll('[data-jump]').forEach(function(b){
-    b.onclick=function(){
-      var key=b.dataset.jump;
-      var el=document.getElementById(key);
-      side.classList.remove('open');
-      // jumping to a collapsed Forms/Key-numbers section would land on a header
-      // with nothing visible below it — open it first.
-      if((key==='forms'||key==='nums')&&!notesSecOpen(n,key)){
-        notesSecSetOpen(n,key,true);
-        var body=document.getElementById('secbody-'+key);
-        if(body)body.style.display='block';
-        if(el){var chev=el.querySelector('.chev');if(chev)chev.textContent='▾';}
-      }
-      scrollToEl(el);
-    };
+    b.onclick=function(){ side.classList.remove('open'); notesJumpTo(b.dataset.jump); };
   });
   restoreScroll();
   var ns=document.getElementById('noteSearch');
@@ -165,7 +240,7 @@ function showNotes(n,backFn){
     }).join('')+'</div>'):'<p style="color:var(--muted);font-size:13px">No matches in this chapter.</p>';
     box.querySelectorAll('[data-go]').forEach(function(el){
       el.style.cursor='pointer';
-      el.onclick=function(){var t=document.getElementById(el.dataset.go);scrollToEl(t);};
+      el.onclick=function(){ notesJumpTo(el.dataset.go); };
     });
     var x=document.getElementById('noteResX');
     if(x)x.onclick=function(){ns.value='';box.innerHTML='';};
