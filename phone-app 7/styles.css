@@ -115,8 +115,19 @@
   #noteRes,#shBody{clear:both;}
   .nresbox{position:sticky;top:46px;z-index:44;max-height:52vh;overflow-y:auto;background:var(--card);border:1px solid var(--blue);border-radius:10px;padding:10px 12px;margin:6px 0 14px;box-shadow:0 6px 22px rgba(0,0,0,.18);}
   @media(max-width:820px){
-    .nsearchwrap{justify-content:stretch;}
+    /* On desktop this wrapper is zero-height by design: the search box floats in
+       the top-right corner while the heading's padding-right:210px (set inline,
+       per-render, in notes.js/study-tools.js) reserves room for it so text
+       doesn't run underneath. On mobile the box goes full-width (below) and is
+       no longer confined to a corner, so both assumptions break: a zero-height
+       wrapper lets it overlap the heading instead of pushing it down, and the
+       210px reservation just squeezes the heading into a narrow column with
+       nothing to its right anymore. Give the wrapper real height so it sits in
+       normal flow (still sticky — a search bar that follows you down the page
+       reads fine full-width too), and cancel the now-pointless padding.       */
+    .nsearchwrap{justify-content:stretch;height:auto;}
     .nsearch,.nsearch:focus{width:100%;}
+    .nhead-t h2{padding-right:0 !important;}
   }
   .nh{font-size:16px;margin:22px 0 8px;padding-bottom:6px;border-bottom:2px solid var(--border);scroll-margin-top:14px;}
   .nsec{margin-bottom:18px;scroll-margin-top:14px;}
@@ -383,8 +394,18 @@
   @media(max-width:820px){
     body{padding:10px 8px;}
     .wrap{max-width:100%;padding-bottom:100px;}
-    .layout{flex-direction:column;}
+    /* align-items:flex-start (set for the desktop side-by-side layout) makes a
+       column-direction flex item shrink-wrap to its content's preferred width
+       instead of filling the screen — .main was sizing itself off whatever
+       question/badge text happened to be widest, overflowing on some questions
+       and not others. stretch is what column layout actually needs here. */
+    .layout{flex-direction:column;align-items:stretch;}
     .card{padding:16px;border-radius:12px;}
+    /* auto table-layout squeezes whichever column has the shortest words down to
+       near-nothing once the row is wider than the screen (e.g. "Forms in this
+       chapter" — three columns of very different natural widths). Let the row
+       scroll horizontally instead of destroying column readability. */
+    .ntable{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}
     .qtext{font-size:16px;}
     .opt{padding:14px 13px;font-size:15px;margin-bottom:9px;}
     .nav2{gap:10px;position:sticky;bottom:8px;}
@@ -406,7 +427,7 @@
     .end table{font-size:12.5px;}
     .end th,.end td{padding:6px 6px;}
     .badges{padding-right:0;}
-    .flagbtn{padding:5px 12px;}
+    .flagbtn{padding:9px 14px;}
   }
   @media(max-width:600px){
     .top{flex-wrap:wrap;row-gap:8px;align-items:center;}

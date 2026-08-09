@@ -4,7 +4,7 @@
 
 // Remember the reading position for each screen, so leaving and coming back puts you
 // back where you were rather than at the top.
-var SCRKEY='ea3quiz_scroll', CURSIG=null, SCRTIMER=null;
+var SCRKEY='ea3quiz_scroll', CURSIG=null, CURVIEW=null, SCRTIMER=null;
 function scrollMap(){ try{return JSON.parse(localStorage.getItem(SCRKEY))||{};}catch(e){return {};} }
 function sigOf(v){
   if(!v)return null;
@@ -83,6 +83,7 @@ function markView(kind,extra){
   if(CURSIG&&CURSIG!==sig){ rememberScroll(); if(PREV_VIEW) navPush(PREV_VIEW); }
   PREV_VIEW=v;   // bank where we were before moving on
   CURSIG=sig;
+  CURVIEW=v;
   saveView(v);
 }
 function restoreView(){

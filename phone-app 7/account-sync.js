@@ -450,8 +450,13 @@ async function syncNow(force){
       try{ if(typeof swRender==='function') swRender(); }catch(e){}
       try{ var _p=document.getElementById('swPanel'); if(_p && _p.classList.contains('open') && typeof swPanelRender==='function') swPanelRender(); }catch(e){}
       try{
-        if(typeof exam==='undefined' || exam===-1){
-          // Not in a quiz: safe to restore the menu view so home counts refresh.
+        // Only re-render for a background sync when the visible screen is the
+        // home menu — its progress counts are what "changed" refers to. Any other
+        // screen (chapter notes, cheat sheets, dashboard, etc.) gets a destructive
+        // full re-render from this, which resets scroll position out from under a
+        // reader every ~20s (the live-sync poll interval) even mid-scroll.
+        var _onHome = !CURVIEW || CURVIEW.kind==='menu' || CURVIEW.kind==='parts';
+        if((typeof exam==='undefined' || exam===-1) && _onHome){
           if(typeof restoreView==='function') restoreView();
         }else if(Array.isArray(QUESTIONS)){
           // In a quiz: reload answers/flags from the freshly-pulled localStorage
