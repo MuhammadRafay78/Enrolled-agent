@@ -2,6 +2,11 @@
 // Bump CACHE when the app changes; the old cache is deleted on activate.
 const CACHE = 'ea-prep-v55';
 const ASSETS = ['./','./index.html','./manifest.webmanifest',
+  './styles.css','./ai-tutor.css',
+  './data.js','./questions.js','./migration-map.js',
+  './quiz-state.js','./account-sync.js','./auth-account-ui.js','./menu.js',
+  './review.js','./flashcards.js','./quiz-view.js','./study-tools.js',
+  './notes.js','./app-boot.js','./ai-tutor.js',
   './icon-192.png','./icon-512.png','./icon-192-maskable.png','./icon-512-maskable.png','./apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
