@@ -221,14 +221,18 @@ function buildChapterCardPool(unit){
   });
   return pool;
 }
-function startChapterFlashcards(unit){
+// exitFn lets callers choose where "Exit" lands: the Chapter Notes page's own
+// button wants to return to that chapter, while the top-level chapter picker
+// (chapterFlashcardsList) wants to return to itself so picking another
+// chapter is one tap instead of a detour through Chapter Notes.
+function startChapterFlashcards(unit,exitFn){
   var pool=buildChapterCardPool(unit);
   if(!pool.length){ alert('No flashcards available for this chapter yet.'); return; }
   var u=CHNOTES[PART][String(unit)];
   FC_TITLE='SU '+unit+': '+u.t+' — Flashcards';
   FC_POOL=pool;
-  FC_EXIT_FN=function(){ showNotes(String(unit)); };
-  FC_RESTART_FN=function(){ startChapterFlashcards(unit); };
+  FC_EXIT_FN=exitFn || function(){ showNotes(String(unit)); };
+  FC_RESTART_FN=function(){ startChapterFlashcards(unit,exitFn); };
   var ratings=loadFcRatings();
   FC_DECK=pickWeightedDeck(pool, ratings, pool.length); // show the whole chapter, weakest-first-biased order
   FC_POS=0;
@@ -238,6 +242,30 @@ function startChapterFlashcards(unit){
   bindFcKeys();
   ensureConceptForCurrent();
   renderFlashcard();
+}
+
+// Top-level entry point (Reference tile on the menu) — pick a chapter, then
+// straight into that chapter's flashcards, no detour through Chapter Notes.
+function chapterFlashcardsList(){
+  markView('chapfclist');
+  setFloatBack(goBack,'← Back');
+  side.classList.remove('active','open'); document.body.classList.remove('inquiz'); stopTimer(); stopClock();
+  document.getElementById('counter').textContent=PARTS[PART].name+' — Chapter Flashcards';
+  document.getElementById('score').textContent='';
+  document.getElementById('prog').style.width='0%';
+  var C=CHNOTES[PART];
+  if(!C){card.innerHTML='<div class="end"><h2>🧠 Chapter Flashcards</h2><p style="margin:14px 0">No study-guide notes are loaded for this part yet.</p><button class="restart" id="menu">Exam Menu</button></div>';document.getElementById('menu').onclick=showMenu;return;}
+  var h='<h2 style="margin-bottom:6px">🧠 Chapter Flashcards <span style="font-weight:400;color:var(--muted);font-size:14px">— '+PARTS[PART].name+'</span></h2>'+
+    '<p style="color:var(--muted);font-size:14px;margin-bottom:14px">Pick a chapter to study its forms, key numbers &amp; deadlines as flashcards.</p>';
+  Object.keys(C).sort(function(a,b){return a-b;}).forEach(function(n){
+    var u=C[n], count=chapterCardCount(n);
+    h+='<button class="opt" data-cfc="'+n+'"'+(count?'':' disabled style="opacity:.5;cursor:default"')+'><b>SU '+n+': '+esc(u.t)+'</b><br>'+
+       '<span style="color:var(--muted);font-size:13px">'+(count?count+' cards — '+(u.f?u.f.length:0)+' forms, '+(u.k?u.k.length:0)+' key numbers':'no cards yet')+'</span></button>';
+  });
+  h+='<div class="nav2"><button class="navbtn" id="cfcBack">← Exam Menu</button><span></span></div>';
+  card.innerHTML=h;
+  card.querySelectorAll('[data-cfc]').forEach(function(b){b.onclick=function(){startChapterFlashcards(b.dataset.cfc,chapterFlashcardsList);};});
+  document.getElementById('cfcBack').onclick=showMenu;
 }
 
 function fcExit(){ (FC_EXIT_FN||showMenu)(); }
