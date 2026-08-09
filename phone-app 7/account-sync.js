@@ -75,7 +75,8 @@ function isSynced(k){
     'ea3quiz_v2_tutorSize': 1,            // AI panel width preference
     'ea3quiz_v2_ai_migration_v1': 1,      // one-time boot marker
     'ea_theme_local': 1,                  // theme preference is already local-only by name
-    'ea3quiz_sec': 1                      // collapsed-section state
+    'ea3quiz_sec': 1,                     // collapsed-section state (menu)
+    'ea3quiz_notesec': 1                  // collapsed-section state (chapter notes)
   };
   if(DEVICE_LOCAL[k]) return false;
   return true;
@@ -450,8 +451,13 @@ async function syncNow(force){
       try{ if(typeof swRender==='function') swRender(); }catch(e){}
       try{ var _p=document.getElementById('swPanel'); if(_p && _p.classList.contains('open') && typeof swPanelRender==='function') swPanelRender(); }catch(e){}
       try{
-        if(typeof exam==='undefined' || exam===-1){
-          // Not in a quiz: safe to restore the menu view so home counts refresh.
+        // Only re-render for a background sync when the visible screen is the
+        // home menu — its progress counts are what "changed" refers to. Any other
+        // screen (chapter notes, cheat sheets, dashboard, etc.) gets a destructive
+        // full re-render from this, which resets scroll position out from under a
+        // reader every ~20s (the live-sync poll interval) even mid-scroll.
+        var _onHome = !CURVIEW || CURVIEW.kind==='menu' || CURVIEW.kind==='parts';
+        if((typeof exam==='undefined' || exam===-1) && _onHome){
           if(typeof restoreView==='function') restoreView();
         }else if(Array.isArray(QUESTIONS)){
           // In a quiz: reload answers/flags from the freshly-pulled localStorage
