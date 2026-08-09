@@ -6,7 +6,12 @@
   .score-chip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-weight:600;color:var(--ink);}
   .bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:20px;}
   .bar>div{height:100%;background:var(--blue);border-radius:4px;transition:width .3s;}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px;box-shadow:0 1px 3px rgba(0,0,0,.06);}
+  /* overflow-wrap is inherited, so this is a blanket backstop: any long unbroken
+     token anywhere in the (large, hand-authored) book content data — a URL, a
+     citation with no spaces — breaks instead of forcing the whole page wider
+     than the screen. Normal word-wrapping is unaffected; this only kicks in
+     when a single word genuinely can't fit. */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px;box-shadow:0 1px 3px rgba(0,0,0,.06);overflow-wrap:anywhere;}
   .badges{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
   .badge{font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px;background:#eff6ff;color:var(--blue);}
   .badge.unit{background:#f1f5f9;color:var(--muted);}

@@ -3,6 +3,14 @@
 // ---------- chapter notes (full detail, from the study guide) ----------
 var NOTEBACK=null;
 function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+// Collapse state for the Forms / Key numbers headers in Chapter Notes, keyed by
+// part+chapter+section so each chapter remembers its own state. Device-local
+// (see DEVICE_LOCAL in account-sync.js) — a display preference, not progress.
+function notesSecState(){try{return JSON.parse(localStorage.getItem('ea3quiz_notesec'))||{};}catch(e){return {};}}
+function notesSecSave(s){try{localStorage.setItem('ea3quiz_notesec',JSON.stringify(s));}catch(e){}}
+function notesSecKeyFor(unit,name){return PART+':'+unit+':'+name;}
+function notesSecOpen(unit,name){var v=notesSecState()[notesSecKeyFor(unit,name)];return v!==false;} // default: open
+function notesSecSetOpen(unit,name,open){var s=notesSecState();s[notesSecKeyFor(unit,name)]=open;notesSecSave(s);}
 function scrollToEl(el){
   if(!el)return;
   try{
@@ -51,7 +59,9 @@ function showNotes(n,backFn){
     '<div class="nhead"><div class="nhead-t"><h2 style="margin:0 0 2px;padding-right:210px">SU '+n+': '+esc(u.t)+'</h2>'+
     '<p style="color:var(--muted);font-size:13px;margin:0">Complete notes from your '+PARTS[PART].name+' study guide — forms, thresholds, rules'+(u.ex?', and worked examples':'')+'.</p></div></div><div id="noteRes"></div>';
   // forms
-  h+='<h3 id="forms" class="nh">📄 Forms in this chapter</h3>';
+  var formsOpen=notesSecOpen(n,'forms');
+  h+='<button type="button" class="nh sechead" id="forms" data-secn="forms"><span>📄 Forms in this chapter</span><span class="chev">'+(formsOpen?'▾':'▸')+'</span></button>';
+  h+='<div class="secbody" id="secbody-forms" style="display:'+(formsOpen?'block':'none')+'">';
   if(u.f.length){
     h+='<table class="ntable"><tr><th style="width:132px">Form</th><th>Official title</th><th>What it is for</th></tr>';
     u.f.forEach(function(f){
@@ -61,11 +71,15 @@ function showNotes(n,backFn){
     });
     h+='</table>';
   } else h+='<p style="color:var(--muted)">No forms referenced in this chapter.</p>';
+  h+='</div>';
   // key numbers
-  h+='<h3 id="nums" class="nh">🔢 Key numbers, thresholds &amp; deadlines</h3>';
+  var numsOpen=notesSecOpen(n,'nums');
+  h+='<button type="button" class="nh sechead" id="nums" data-secn="nums"><span>🔢 Key numbers, thresholds &amp; deadlines</span><span class="chev">'+(numsOpen?'▾':'▸')+'</span></button>';
+  h+='<div class="secbody" id="secbody-nums" style="display:'+(numsOpen?'block':'none')+'">';
   if(u.k.length){
     h+='<ul class="nlist">'+u.k.map(function(x){return '<li>'+esc(x.t)+'<div class="nsrc">'+esc(x.sec)+'</div></li>';}).join('')+'</ul>';
   } else h+='<p style="color:var(--muted)">No specific thresholds listed in this chapter.</p>';
+  h+='</div>';
   // sections
   h+='<h3 class="nh">📚 Detailed notes</h3>';
   u.s.forEach(function(s,i){
@@ -97,10 +111,29 @@ function showNotes(n,backFn){
   setFloatBack(back,'← Back');
   var nb=document.getElementById('notesBack'); if(nb)nb.onclick=back;
   var sc=document.getElementById('sideClose'); if(sc)sc.onclick=function(){side.classList.remove('open');};
+  card.querySelectorAll('[data-secn]').forEach(function(b){
+    b.onclick=function(){
+      var key=b.dataset.secn;
+      var open=!notesSecOpen(n,key);
+      notesSecSetOpen(n,key,open);
+      var body=document.getElementById('secbody-'+key), chev=b.querySelector('.chev');
+      if(body)body.style.display=open?'block':'none';
+      if(chev)chev.textContent=open?'▾':'▸';
+    };
+  });
   side.querySelectorAll('[data-jump]').forEach(function(b){
     b.onclick=function(){
-      var el=document.getElementById(b.dataset.jump);
+      var key=b.dataset.jump;
+      var el=document.getElementById(key);
       side.classList.remove('open');
+      // jumping to a collapsed Forms/Key-numbers section would land on a header
+      // with nothing visible below it — open it first.
+      if((key==='forms'||key==='nums')&&!notesSecOpen(n,key)){
+        notesSecSetOpen(n,key,true);
+        var body=document.getElementById('secbody-'+key);
+        if(body)body.style.display='block';
+        if(el){var chev=el.querySelector('.chev');if(chev)chev.textContent='▾';}
+      }
       scrollToEl(el);
     };
   });

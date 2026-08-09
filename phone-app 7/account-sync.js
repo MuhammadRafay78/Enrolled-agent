@@ -75,7 +75,8 @@ function isSynced(k){
     'ea3quiz_v2_tutorSize': 1,            // AI panel width preference
     'ea3quiz_v2_ai_migration_v1': 1,      // one-time boot marker
     'ea_theme_local': 1,                  // theme preference is already local-only by name
-    'ea3quiz_sec': 1                      // collapsed-section state
+    'ea3quiz_sec': 1,                     // collapsed-section state (menu)
+    'ea3quiz_notesec': 1                  // collapsed-section state (chapter notes)
   };
   if(DEVICE_LOCAL[k]) return false;
   return true;
