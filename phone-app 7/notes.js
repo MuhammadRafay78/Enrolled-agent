@@ -49,26 +49,41 @@ function notesIndex(n){
 // first substantive sentence (skipping bare list items, which are rarely full
 // sentences) plus, verbatim, any Key Numbers entries already tagged to that
 // exact section title.
-function _firstSentence(text,maxLen){
+// Pulls the lead sentence(s) off a paragraph rather than always just the
+// first one: many of these paragraphs open with a short throat-clearing
+// sentence ("The rules are different for Roth IRA distributions.") with the
+// actual substance in the sentence right after it, so stopping at sentence 1
+// unconditionally produced vacuous gists. Keeps adding sentences until the
+// gist is substantial (~90 chars) or it has two, whichever comes first.
+function _leadSentences(text,maxLen){
   var t=String(text||'').trim();
-  var m=t.match(/^[\s\S]*?[.!?](?=\s|$)/);
-  var s=m?m[0]:t;
-  if(s.length>maxLen){
-    s=s.slice(0,maxLen);
-    var lastSpace=s.lastIndexOf(' ');
-    if(lastSpace>maxLen*0.6)s=s.slice(0,lastSpace);
-    s=s.replace(/[,;:]+$/,'')+'…';
+  // Footnote markers glued straight onto the period (e.g. "...income.177")
+  // hid the real sentence boundary from the regex below — strip them first.
+  t=t.replace(/([a-zA-Z%\)])\.(\d{1,3})(?=\s|$)/g,'$1.');
+  var re=/[^.!?]*[.!?]+(?=\s|$)/g, m, sentences=[], usedLen=0;
+  while((m=re.exec(t))){
+    var piece=m[0].trim();
+    if(!piece)continue;
+    sentences.push(piece);
+    usedLen+=piece.length;
+    if(usedLen>=90||sentences.length>=2)break;
   }
-  return s;
+  var out=sentences.length?sentences.join(' '):t;
+  if(out.length>maxLen){
+    var cut=out.lastIndexOf(', ',maxLen);
+    if(cut<maxLen*0.5)cut=out.lastIndexOf(' ',maxLen);
+    out=out.slice(0,cut>0?cut:maxLen).replace(/[,;:]+$/,'')+'…';
+  }
+  return out;
 }
 function _sectionGist(s){
   for(var j=0;j<s.i.length;j++){
     var kind=s.i[j][0];
     if(kind==='li'||kind==='table'||kind==='ex')continue;
-    return _firstSentence(s.i[j][1],170);
+    return _leadSentences(s.i[j][1],200);
   }
   var firstLi=s.i.filter(function(p){return p[0]==='li';})[0];
-  return firstLi?_firstSentence(firstLi[1],170):'';
+  return firstLi?_leadSentences(firstLi[1],200):'';
 }
 // Bolds $ amounts and % rates so the thresholds jump out at a skim — the rest
 // of the key-number sentence stays as-is, nothing is trimmed or reworded.
@@ -254,9 +269,10 @@ function notesUnitList(){
   document.getElementById('counter').textContent=PARTS[PART].name+' — Chapter Notes';
   document.getElementById('score').textContent='';
   document.getElementById('prog').style.width='0%';
-  if(!C){card.innerHTML='<div class="end"><h2>📘 Chapter Notes</h2><p style="margin:14px 0">No study-guide notes are loaded for this part yet.</p>'+bookDownloadHtml()+'<button class="restart" id="menu">Exam Menu</button></div>';document.getElementById('menu').onclick=showMenu;return;}
+  if(!C){card.innerHTML='<div class="end"><h2>📘 Chapter Notes</h2><p style="margin:14px 0">No study-guide notes are loaded for this part yet.</p>'+bookDownloadHtml()+taxToolDownloadHtml()+'<button class="restart" id="menu">Exam Menu</button></div>';document.getElementById('menu').onclick=showMenu;return;}
   var h='<h2 style="margin-bottom:6px">📘 Chapter Notes <span style="font-weight:400;color:var(--muted);font-size:14px">— '+PARTS[PART].name+'</span></h2><p style="color:var(--muted);font-size:14px;margin-bottom:14px">Your complete study guide, chapter by chapter — forms, thresholds, rules and worked examples.</p>';
   h+=bookDownloadHtml();
+  h+=taxToolDownloadHtml();
   Object.keys(C).sort(function(a,b){return a-b;}).forEach(function(n){
     var u=C[n];
     var nq=(BOOKQ[PART]&&BOOKQ[PART][n])?BOOKQ[PART][n].length:0;
@@ -281,6 +297,16 @@ var BOOK_PDFS={
 function bookDownloadHtml(){
   var b=BOOK_PDFS[PART]; if(!b)return '';
   return '<a class="dlbook" href="'+b.file+'" download>📥 Download the full book (PDF) — <span>'+b.label+'</span></a>';
+}
+// Excel workbooks with worked formulas (tax brackets, credits, deductions —
+// all current-year figures), offered as a download alongside the book PDF.
+// Keyed by Part, same pattern as BOOK_PDFS above.
+var TAX_TOOLS={
+  1:{file:'books/EA-Part1-Tax-Calculation-Master-Sheet-2025.xlsx', label:'2025 Individual Tax Calculation Master Sheet'}
+};
+function taxToolDownloadHtml(){
+  var t=TAX_TOOLS[PART]; if(!t)return '';
+  return '<a class="dlbook" href="'+t.file+'" download>📊 Download Excel formula sheet — <span>'+t.label+'</span></a>';
 }
 function showLibrary(openUnit){
   side.classList.remove('active','open');document.body.classList.remove('inquiz');stopTimer();stopClock();
