@@ -330,6 +330,17 @@ function showNotes(n,backFn){
 // here since multiple chapters now share one DOM — every id below is
 // namespaced with the unit number so chapters can coexist without colliding.
 var BOOK_IO=null, BOOK_HDIO=null;
+// Reading-progress bar: how far down the whole book you are, not just this
+// chapter. Self-guarding on #chbkWrap so it's a no-op outside book view —
+// no separate teardown needed when the user navigates away.
+window.addEventListener('scroll',function(){
+  if(!document.getElementById('chbkWrap'))return;
+  var doc=document.documentElement;
+  var max=doc.scrollHeight-window.innerHeight;
+  var pct=max>0?Math.min(100,Math.max(0,(window.pageYOffset||doc.scrollTop||0)/max*100)):0;
+  var prog=document.getElementById('prog');
+  if(prog)prog.style.width=pct+'%';
+},{passive:true});
 function chapterUnitOrder(){
   return Object.keys(CHNOTES[PART]).sort(function(a,b){return a-b;});
 }
@@ -459,24 +470,6 @@ function notesBookIndex(order,activeUnit){
   h+='<button class="side-btn" id="notesBookBack" style="margin-top:10px">← Chapter list</button>';
   return h;
 }
-function wireBookSide(){
-  side.querySelectorAll('[data-jumpchapter]').forEach(function(b){
-    b.onclick=function(){
-      side.classList.remove('open');
-      var n=b.dataset.jumpchapter, el=document.getElementById('chbk-'+n), C=CHNOTES[PART];
-      if(el){
-        // Update immediately rather than waiting on the scroll-driven observer:
-        // scrollIntoView({block:'start'}) parks the heading at the very top of the
-        // viewport, which can sit outside the observer's detection band for a beat.
-        document.getElementById('counter').textContent='SU '+n+': '+C[n].t+' — Chapter Notes';
-        side.querySelectorAll('[data-jumpchapter]').forEach(function(x){x.classList.toggle('on',x.dataset.jumpchapter===n);});
-        scrollToEl(el);
-      } else showNotesBook(n);
-    };
-  });
-  var sc=document.getElementById('sideClose'); if(sc)sc.onclick=function(){side.classList.remove('open');};
-  var bb=document.getElementById('notesBookBack'); if(bb)bb.onclick=function(){ notesUnitList(); };
-}
 function showNotesBook(startUnit){
   startUnit=String(startUnit);
   var C=CHNOTES[PART];
@@ -489,7 +482,8 @@ function showNotesBook(startUnit){
   document.getElementById('counter').textContent='SU '+startUnit+': '+C[startUnit].t+' — Chapter Notes';
   document.getElementById('score').textContent='Study guide';
   document.getElementById('prog').style.width='0%';
-  var h='<p style="color:var(--muted);font-size:13px;margin:0 0 16px">Scroll down for the next chapter — every chapter in '+esc(PARTS[PART].name)+' follows in order, no need to go back.</p>';
+  var h='<p style="color:var(--muted);font-size:13px;margin:0 0 10px">Scroll down for the next chapter — every chapter in '+esc(PARTS[PART].name)+' follows in order, no need to go back.</p>';
+  h+='<div class="nsearchwrap" style="position:static;height:auto;justify-content:stretch;margin-bottom:14px"><input class="nsearch" id="bookSearch" style="width:100%" placeholder="🔍 Search all of '+esc(PARTS[PART].name)+'"></div><div id="bookSearchRes"></div>';
   h+='<div class="chbk-wrap" id="chbkWrap">'+chapterBlockHTML(startUnit)+'</div>';
   h+='<div class="chbk-sentinel" id="chbkSentinel"></div><div class="chbk-loading" id="chbkLoading" style="display:none"></div>';
   h+='<div class="nav2"><button class="navbtn" id="chbkBack">← Chapter list</button><span></span></div>';
@@ -498,12 +492,22 @@ function showNotesBook(startUnit){
   document.getElementById('chbkBack').onclick=back;
   setFloatBack(back,'← Chapter list');
   side.innerHTML=notesBookIndex(order,startUnit);
-  wireBookSide();
   wireChapterBlock(startUnit);
 
+  // Re-observing after appending chapters fires an "initial state" callback
+  // reflecting wherever the page is scrolled *right now* — which, for a jump
+  // to a specific section (search results land mid-chapter, not on the
+  // chapter's own heading), is still the pre-jump position at the instant
+  // ensureLoadedThrough() runs, before the smooth scroll has moved anything.
+  // That stale callback would otherwise race the explicit header update in
+  // goToBookTarget() and win, snapping the header back to the old chapter.
+  // Suppressing observer-driven updates for a beat after an explicit jump
+  // lets the explicit update stand until the scroll (and real tracking) catches up.
+  var lastJumpAt=0;
   function observeHeadings(){
     if(BOOK_HDIO)BOOK_HDIO.disconnect();
     BOOK_HDIO=new IntersectionObserver(function(entries){
+      if(Date.now()-lastJumpAt<800)return;
       entries.forEach(function(e){
         if(!e.isIntersecting)return;
         var n=e.target.dataset.hd;
@@ -519,27 +523,77 @@ function showNotesBook(startUnit){
   observeHeadings();
 
   var loadedIdx=startIdx;
-  function loadNext(){
+  // Appends chapters in order up through (and including) targetIdx — used both
+  // by the infinite-scroll sentinel (one chapter at a time) and by search
+  // jumping straight to a match in a chapter that hasn't scrolled into view yet.
+  function ensureLoadedThrough(targetIdx){
+    var wrap=document.getElementById('chbkWrap');
+    while(loadedIdx<targetIdx&&loadedIdx<order.length-1){
+      loadedIdx++;
+      var nextN=order[loadedIdx];
+      var tmp=document.createElement('div');
+      tmp.innerHTML=chapterBlockHTML(nextN);
+      while(tmp.firstChild)wrap.appendChild(tmp.firstChild);
+      wireChapterBlock(nextN);
+    }
+    observeHeadings();
     if(loadedIdx>=order.length-1){
       if(BOOK_IO){BOOK_IO.disconnect();BOOK_IO=null;}
       var loading=document.getElementById('chbkLoading');
       if(loading){loading.style.display='block';loading.textContent='— End of '+PARTS[PART].name+' chapter notes —';}
-      return;
     }
-    loadedIdx++;
-    var nextN=order[loadedIdx];
-    var wrap=document.getElementById('chbkWrap');
-    var tmp=document.createElement('div');
-    tmp.innerHTML=chapterBlockHTML(nextN);
-    while(tmp.firstChild)wrap.appendChild(tmp.firstChild);
-    wireChapterBlock(nextN);
-    observeHeadings();
   }
   if(BOOK_IO)BOOK_IO.disconnect();
   BOOK_IO=new IntersectionObserver(function(entries){
-    entries.forEach(function(e){ if(e.isIntersecting)loadNext(); });
+    entries.forEach(function(e){ if(e.isIntersecting)ensureLoadedThrough(loadedIdx+1); });
   },{rootMargin:'800px 0px 800px 0px'});
   BOOK_IO.observe(document.getElementById('chbkSentinel'));
+
+  // Jump to a specific chapter (and, if given, one of its sections), loading
+  // whatever chapters between here and there haven't been appended yet. A
+  // chapter before the book's start unit was never (and won't be) loaded
+  // forward, so land there by restarting the book at that earlier chapter.
+  function goToBookTarget(n,secIdx){
+    var idx=order.indexOf(n);
+    if(idx<startIdx){ showNotesBook(n); return; }
+    lastJumpAt=Date.now();
+    ensureLoadedThrough(idx);
+    document.getElementById('counter').textContent='SU '+n+': '+C[n].t+' — Chapter Notes';
+    side.querySelectorAll('[data-jumpchapter]').forEach(function(x){x.classList.toggle('on',x.dataset.jumpchapter===n);});
+    var el=document.getElementById(secIdx!=null?('chbk-'+n+'-s'+secIdx):('chbk-'+n));
+    scrollToEl(el);
+  }
+  side.querySelectorAll('[data-jumpchapter]').forEach(function(b){
+    b.onclick=function(){ side.classList.remove('open'); goToBookTarget(b.dataset.jumpchapter,null); };
+  });
+  var sc=document.getElementById('sideClose'); if(sc)sc.onclick=function(){side.classList.remove('open');};
+  var bb=document.getElementById('notesBookBack'); if(bb)bb.onclick=function(){ notesUnitList(); };
+  var bsIn=document.getElementById('bookSearch'), bsBox=document.getElementById('bookSearchRes');
+  bsIn.oninput=function(){
+    var q=bsIn.value.trim().toLowerCase();
+    if(q.length<3){bsBox.innerHTML='';return;}
+    var hits=[];
+    order.forEach(function(n){
+      var u=C[n];
+      u.s.forEach(function(s,si){
+        if(hits.length>=40)return;
+        if(s.t.toLowerCase().indexOf(q)>=0)hits.push({unit:n,sec:si,title:s.t,snippet:(s.i[0]?s.i[0][1]:'')});
+        s.i.forEach(function(p){
+          if(hits.length>=40)return;
+          if(p[1].toLowerCase().indexOf(q)>=0)hits.push({unit:n,sec:si,title:s.t,snippet:p[1]});
+        });
+      });
+    });
+    bsBox.innerHTML=hits.length?('<div class="nres nresbox"><div style="font-size:12px;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between"><span>'+hits.length+' match'+(hits.length>1?'es':'')+' — click to jump</span><button id="bookSearchX" style="border:none;background:none;color:var(--muted);cursor:pointer;font-size:14px">✕</button></div>'+hits.map(function(x,i){
+      return '<div class="nresi" data-goidx="'+i+'"><b>SU '+x.unit+' · '+esc(x.title)+'</b><p>'+esc(x.snippet)+'</p></div>';
+    }).join('')+'</div>'):'<p style="color:var(--muted);font-size:13px">No matches.</p>';
+    bsBox.querySelectorAll('[data-goidx]').forEach(function(el){
+      el.style.cursor='pointer';
+      el.onclick=function(){ var x=hits[+el.dataset.goidx]; goToBookTarget(x.unit,x.sec); };
+    });
+    var xbtn=document.getElementById('bookSearchX');
+    if(xbtn)xbtn.onclick=function(){bsIn.value='';bsBox.innerHTML='';};
+  };
   restoreScroll();
 }
 function notesUnitList(){
