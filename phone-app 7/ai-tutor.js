@@ -184,22 +184,35 @@
     try{
       const v = JSON.parse(localStorage.getItem(STUDY_LIST_KEY));
       let list = Array.isArray(v) ? v : [];
-      // One-time self-heal for entries saved by older versions of addToStudyList,
-      // which (before the ref-dedup and 3-ref cap existed) could save the same book
-      // section twice back-to-back, or more than 3 refs — including irrelevant ones
-      // pulled in by a too-vague note. Idempotent: a no-op once an entry is clean.
+      // One-time self-heal for entries saved by older versions of addToStudyList:
+      // - de-dupe + cap refs to 3 (older code, before that existed, could save the
+      //   same section twice back-to-back, or more than 3, including irrelevant
+      //   ones pulled in by a too-vague note)
+      // - strip a leaked "li"/"o" list-tag token frozen into ref snippets by the
+      //   old _sectionText() bug (fixed above) — always a standalone 1-2 letter
+      //   lowercase word directly before capitalized text, so safe to target with
+      //   a regex on already-saved text.
+      // Idempotent: a no-op once an entry is clean.
       let changed = false;
+      const cleanSnippet = s => (typeof s === 'string' ? s.replace(/\s+\b(li|o)\b\s+(?=[A-Z])/g, '\n') : s);
       list = list.map(e => {
-        if (!Array.isArray(e.refs) || e.refs.length <= 1) return e;
+        if (!Array.isArray(e.refs) || !e.refs.length) return e;
         const seen = new Set();
         const deduped = e.refs.filter(r => {
           const key = r.chNum + '::' + r.sec;
           if (seen.has(key)) return false;
           seen.add(key);
           return true;
+        }).slice(0, 3);
+        const cleanedRefs = deduped.map(r => {
+          const cleaned = cleanSnippet(r.snippet);
+          return cleaned !== r.snippet ? Object.assign({}, r, { snippet: cleaned }) : r;
         });
-        const trimmed = deduped.slice(0, 3);
-        if (trimmed.length !== e.refs.length) { changed = true; return Object.assign({}, e, { refs: trimmed }); }
+        const snippetChanged = cleanedRefs.some((r, i) => r !== deduped[i]);
+        if (cleanedRefs.length !== e.refs.length || snippetChanged) {
+          changed = true;
+          return Object.assign({}, e, { refs: cleanedRefs });
+        }
         return e;
       });
       if (changed) _saveStudyList(list);
@@ -660,13 +673,23 @@
       .filter(w => w.length >= 3 && !_STOPWORDS.has(w));
   }
   function _sectionText(sec){
-    // Sections in CHNOTES have shape { t, l, i: [ [type, content], ... ] }
+    // Sections in CHNOTES have shape { t, l, i: [ [type, content], ... ] }.
+    // `type` (e.g. "li", "o") is an internal list-style tag, not text — joining
+    // the whole tuple used to leak it straight into the output ("li Line 11: ...
+    // li Line 12: ...", "o Jury duty pay ... rule o Deductible ... rule"), which
+    // is what showed up as garbage in both the AI's context and saved study-list
+    // ref snippets. Drop the tag, keep the content, one item per line (the ref
+    // display uses white-space:pre-wrap, so this reads as a real list again).
     if (!sec) return '';
     let out = String(sec.t || '');
     if (Array.isArray(sec.i)) {
       sec.i.forEach(item => {
-        if (Array.isArray(item)) out += ' ' + item.join(' ');
-        else if (typeof item === 'string') out += ' ' + item;
+        if (Array.isArray(item)) {
+          const content = item.slice(1).join(' ').trim();
+          if (content) out += '\n' + content;
+        } else if (typeof item === 'string' && item.trim()) {
+          out += '\n' + item.trim();
+        }
       });
     }
     return out;
