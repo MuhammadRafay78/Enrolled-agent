@@ -286,8 +286,11 @@ function showMenu(){
   var _mixCount=(function(){var seen={},n=0;collectFlagged().concat(collectWrong()).forEach(function(x){if(!seen[x.ref]){seen[x.ref]=1;n++;}});return n;})();
   tiles.push('<button class="mtile" id="mixBtn"'+(_mixCount?'':' disabled style="opacity:.5;cursor:default"')+'><span class="ic">'+micon('shuffle')+'</span><span class="nm">Mix &amp; shuffle</span>'+
     '<span class="sub'+(_mixCount?' warn':'')+'">'+(_mixCount?_mixCount+' wrong + flagged':'nothing to mix')+'</span></button>');
-  tiles.push('<button class="mtile" id="fcBtn"'+(_wrongCount?'':' disabled style="opacity:.5;cursor:default"')+'><span class="ic">'+micon('card')+'</span><span class="nm">Flashcards</span>'+
-    '<span class="sub'+(_wrongCount?' warn':'')+'">'+(_wrongCount?(fcMasteryPct()+'% mastered · '+_wrongCount+' cards'):'no cards yet')+'</span></button>');
+  tiles.push('<button class="mtile" id="fcBtn"'+(_wrongCount?'':' disabled style="opacity:.5;cursor:default"')+'><span class="ic">'+micon('card')+'</span><span class="nm">Review Flashcards</span>'+
+    '<span class="sub'+(_wrongCount?' warn':'')+'">'+(_wrongCount?(fcMasteryPct(collectWrong())+'% mastered · '+_wrongCount+' cards'):'no cards yet')+'</span></button>');
+  if(CHNOTES[PART]){
+    tiles.push('<button class="mtile" id="chapFcBtn"><span class="ic">'+micon('book')+'</span><span class="nm">Chapter Flashcards</span><span class="sub">browse by chapter</span></button>');
+  }
   // "Toughest for me" — curated quiz of the hardest questions for THIS student:
   // wrong + flagged (deduped) + a top-up of unanswered questions in weak chapters.
   var _toughPreview = (function(){
@@ -324,6 +327,7 @@ function showMenu(){
   var _wbn=document.getElementById('wrongBtn'); if(_wbn&&_wrongCount)_wbn.onclick=startWrongReview;
   var _mbn=document.getElementById('mixBtn'); if(_mbn&&_mixCount)_mbn.onclick=startShuffledWrongFlagged;
   var _fcbn=document.getElementById('fcBtn'); if(_fcbn&&_wrongCount)_fcbn.onclick=startFlashcards;
+  var _cfcbn=document.getElementById('chapFcBtn'); if(_cfcbn)_cfcbn.onclick=chapterFlashcardsList;
   var _tbn=document.getElementById('toughBtn'); if(_tbn&&_toughPreview)_tbn.onclick=startToughestForMe;
   document.getElementById('dashBtn').onclick=showDashboard;
   var mb=document.getElementById('mcqBtn'); if(mb)mb.onclick=mcqChapterList;
