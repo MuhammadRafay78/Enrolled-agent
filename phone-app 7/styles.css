@@ -23,6 +23,13 @@
   .opt.correct{border-color:var(--green);background:var(--green-bg);}
   .opt.wrong{border-color:var(--red);background:var(--red-bg);}
   .opt.dim{opacity:.55;}
+  .opt.weak{border-color:var(--red);}
+  /* "I'm weak on this chapter" flag toggle, shown at the top of a chapter in
+     the book view, and its read-only echo (.wkmark) in the chapter list and
+     the book view's own TOC drawer. */
+  .wkflag{display:block;width:100%;text-align:center;margin:0 0 14px;padding:9px 14px;border-radius:10px;border:1px solid var(--border);background:var(--card);color:var(--muted);font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .wkflag:hover{border-color:var(--red);color:var(--red);}
+  .wkflag.on{border-color:var(--red);background:var(--red-bg);color:var(--red);}
   .verdict{font-size:18px;font-weight:700;margin:18px 0 10px;}
   .verdict.ok{color:var(--green);} .verdict.no{color:var(--red);}
   .exp{border-top:1px solid var(--border);padding-top:14px;margin-top:6px;font-size:14.5px;display:none;}
