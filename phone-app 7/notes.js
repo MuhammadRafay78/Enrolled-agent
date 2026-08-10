@@ -64,26 +64,51 @@ function notesIndex(n){
 // the real sentence boundary — used both when checking whether text looks
 // like a real sentence and when splitting it, so a footnoted ending doesn't
 // get mistaken for "no terminal punctuation" in one place and stripped in
-// the other.
+// the other. The same marker turns up glued onto a mid-sentence comma just
+// as often (e.g. "...Acceptance Agent,13 to request..."), left dangling
+// right in the middle of a gist if not stripped the same way — a digit
+// glued after a letter+comma is never part of the real number the way
+// "$1,234" is (that comma is always preceded by a digit, not a letter), so
+// this can't be confused with an actual thousands separator.
 function _stripFootnoteMarkers(text){
-  return String(text||'').replace(/([a-zA-Z%\)])\.(\d{1,3})(?=\s|$)/g,'$1.');
+  return String(text||'')
+    .replace(/([a-zA-Z%\)])\.(\d{1,3})(?=\s|$)/g,'$1.')
+    .replace(/([a-zA-Z%\)]),(\d{1,3})(?=\s|$)/g,'$1,');
 }
 function _leadSentences(text,maxLen){
   var t=_stripFootnoteMarkers(text).trim();
   // Abbreviations like "U.S." or "I.R.S." are internal periods with no
   // trailing space, which the boundary regex below can't tell apart from a
   // real sentence end otherwise — it would match nothing at the true start
-  // and resync mid-word, producing garbage like "S. S.". Temporarily swap
-  // those periods for a placeholder so they can't be mistaken for a
-  // boundary, then restore them in each extracted piece afterward.
+  // and resync mid-word, producing garbage like "S. S.". A decimal number
+  // like the "2.0" in "SECURE 2.0 Act" has the same problem, but worse:
+  // since nothing ever follows that period with whitespace, no match
+  // succeeds there at all, and the regex silently resyncs on the *next*
+  // real sentence end further down the text — quietly truncating
+  // everything up to and including "2." off the front, e.g. "Under the
+  // SECURE 2." vanishes entirely and the piece starts mid-word: "0 Act,
+  // distributions...". Temporarily swap both kinds of period for a
+  // placeholder so neither can be mistaken for a boundary, then restore
+  // them in each extracted piece afterward.
   var PH='\u0001';
   var hasAbbr=/\b(?:[A-Za-z]\.){2,}/.test(t);
-  var work=hasAbbr?t.replace(/\b(?:[A-Za-z]\.){2,}/g,function(m){return m.split('.').join(PH);}):t;
-  var re=/[^.!?]*[.!?]+(?=\s|$)/g, m, sentences=[];
+  var hasDecimal=/\d\.\d/.test(t);
+  var work=t;
+  if(hasAbbr)work=work.replace(/\b(?:[A-Za-z]\.){2,}/g,function(m){return m.split('.').join(PH);});
+  if(hasDecimal)work=work.replace(/(\d)\.(\d)/g,function(m,a,b){return a+PH+b;});
+  // A quoted term ("the "kiddie tax." We start...") has the identical
+  // problem one step removed: the period is followed by a closing quote
+  // mark, not whitespace, so the same resync-and-truncate happens — the
+  // closing quote itself ends up stranded as the first character of the
+  // next piece. Let optional closing quote/paren characters ride along with
+  // the terminal punctuation itself (not just the lookahead) so they're
+  // captured as part of the sentence that ends, not left dangling for the
+  // next one.
+  var re=/[^.!?]*[.!?]+["'”’)]*(?=\s|$)/g, m, sentences=[];
   while((m=re.exec(work))){
     var piece=m[0].trim();
     if(!piece)continue;
-    if(hasAbbr)piece=piece.split(PH).join('.');
+    if(hasAbbr||hasDecimal)piece=piece.split(PH).join('.');
     sentences.push(piece);
     if(sentences.length>=3)break; // hard stop regardless of length
   }
@@ -131,21 +156,51 @@ function _isUsableGist(g){
   if(!/[.!?…]["'”’)]*$/.test(g) && !(g.length>=40 && /:$/.test(g)))return false;
   var firstChar=g.replace(/^["'“‘(]+/,'').charAt(0);
   if(/[a-z]/.test(firstChar))return false;
+  // A numbered sub-heading ("2) Separation of Liability Relief.") reads as a
+  // grammatically complete sentence to the checks above but is really just a
+  // list marker's label, not a fact. Genuine content that happens to start
+  // with a number still has a $ or % in it somewhere; a bare label doesn't.
+  if(/^\(?\d+[.)]\s/.test(g)&&!/[$%]/.test(g))return false;
   return true;
 }
+// A source paragraph ('rule'-kind) almost always comes before the bullet
+// list ('li'-kind) that follows it, and the paragraph is very often just a
+// throat-clearing definition ("MFS is one of the options available to
+// married couples...") while the actual thresholds and specific rules live
+// in the bullets right after it. Picking "the first candidate that reads
+// like a real sentence," full stop, means the vacuous definition wins every
+// time and the list of $ amounts and specific conditions right below it
+// never even gets considered. Score every candidate instead — 'li' included,
+// not just a last-resort fallback — and prefer the first one carrying an
+// actual number, since that's the whole point of a "numbers included"
+// summary. Falls back to plain reading order when nothing in the section
+// states a number at all, so a purely conceptual section still gets a gist.
+function _hasQuantSignal(text){
+  if(/\$[\d,]+(?:\.\d+)?|\b\d+(?:\.\d+)?%/.test(text))return true;
+  // A bare number can still be a real threshold worth surfacing — an age, a
+  // day count, a contribution cap stated without a $ sign — but plenty of
+  // bare digits in this content are form numbers ("Form 8379"), publication/
+  // schedule/part references ("Part 2, Businesses"), or just the tax year
+  // ("2025") mentioned in passing. Strip those out before checking so they
+  // can't win a slot meant for actual thresholds.
+  var stripped=text
+    .replace(/\b(?:Form|Schedule|Publication|Part)\s+[\w-]+/gi,'')
+    .replace(/\b20\d{2}\b/g,'');
+  return /\b\d{1,3}\b/.test(stripped);
+}
 function _sectionGist(s){
+  var candidates=[];
   for(var j=0;j<s.i.length;j++){
     var kind=s.i[j][0];
-    if(kind==='li'||kind==='table'||kind==='ex')continue;
-    var candidate=_leadSentences(s.i[j][1],200);
-    if(_isUsableGist(candidate))return candidate;
+    if(kind==='table'||kind==='ex')continue;
+    var g=_leadSentences(s.i[j][1],200);
+    if(_isUsableGist(g))candidates.push(g);
   }
-  for(var k=0;k<s.i.length;k++){
-    if(s.i[k][0]!=='li')continue;
-    var liCandidate=_leadSentences(s.i[k][1],200);
-    if(_isUsableGist(liCandidate))return liCandidate;
+  if(!candidates.length)return '';
+  for(var k=0;k<candidates.length;k++){
+    if(_hasQuantSignal(candidates[k]))return candidates[k];
   }
-  return '';
+  return candidates[0];
 }
 // Bolds $ amounts and % rates so the thresholds jump out at a skim — the rest
 // of the key-number sentence stays as-is, nothing is trimmed or reworded.
