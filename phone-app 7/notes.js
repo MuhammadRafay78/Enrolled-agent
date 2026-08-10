@@ -473,6 +473,14 @@ function bookqHTMLScoped(n){
 function wireBookqScoped(n,root){
   var B=BOOKQ[PART]; if(!B||!B[n])return;
   var qs=B[n], L=['A','B','C','D'];
+  // Same "every view counts, including already-answered ones" rule as
+  // wireBookq in study-tools.js — see the comment there. This also runs
+  // again after "Reset answers" re-wires the section, but by then bqState()
+  // has nothing left for this chapter, so nothing gets double-counted.
+  (function(){
+    var s0=bqState();
+    qs.forEach(function(q,i){ if(s0[n+':'+i]!==undefined&&s0[n+':'+i]!==null)recordAnswerToday(); });
+  })();
   root.querySelectorAll('[data-bqn="'+n+'"]').forEach(function(b){
     b.onclick=function(){
       var i=+b.dataset.bq, j=+b.dataset.opt, q=qs[i];

@@ -243,6 +243,17 @@ function bookqHTML(n){
 function wireBookq(n){
   var B=BOOKQ[PART]; if(!B||!B[n])return;
   var qs=B[n], L=['A','B','C','D'];
+  // Every view of this chapter's study questions counts toward today's total —
+  // including ones already answered in a prior session, same as quiz-view.js
+  // counts revisiting an already-answered question, not just the first-ever
+  // answer. Runs once here (called once per genuine chapter view, not on the
+  // in-place DOM patch below), so it can't double-count a question answered
+  // for the first time during this same view — bqState() won't have it yet
+  // at the moment this loop runs.
+  (function(){
+    var s0=bqState();
+    qs.forEach(function(q,i){ if(s0[n+':'+i]!==undefined&&s0[n+':'+i]!==null)recordAnswerToday(); });
+  })();
   card.querySelectorAll('[data-bq]').forEach(function(b){
     b.onclick=function(){
       var i=+b.dataset.bq, j=+b.dataset.opt, q=qs[i];
