@@ -245,10 +245,14 @@ function chapterSummaryHTML(u){
     // s.sum is a hand-written summary, filled in chapter by chapter — actual
     // explanatory prose rather than a sentence lifted verbatim from the
     // source text. Falls back to the mechanical extraction below for any
-    // chapter that doesn't have one yet.
+    // chapter that doesn't have one yet. s.sumTable is a hand-authored,
+    // already-escaped HTML fragment (e.g. a comparison table like Coverdell
+    // vs. 529) — used as-is, not passed through esc(), for the rare section
+    // where a table genuinely reads clearer than another paragraph of prose.
     var gist=s.sum||_sectionGist(s);
     var nums=byTitle[s.t]||[];
     h+='<li'+(s.l===3?' class="nsum-sub"':'')+'><b>'+esc(s.t)+'</b>'+(gist?' — '+esc(gist):'')+
+       (s.sumTable||'')+
        (nums.length?'<ul class="nsum-nums">'+nums.map(function(t){return '<li>'+_highlightNums(t)+'</li>';}).join('')+'</ul>':'')+
        '</li>';
   });
