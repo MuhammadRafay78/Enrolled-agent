@@ -97,6 +97,12 @@ function render(){
   markView('quiz',{exam:exam,pos:pos,mch:MCH,chap:CHAP,xch:XCH});
   if(st&&st.pos!==pos){st.pos=pos;saveState();}
   setFloatBack(goBack,'← Back');
+  // Every time a question is displayed here counts toward today's total/streak
+  // — including revisiting one you already answered or already revealed. This
+  // is a "went through it" counter, not an "answered for the first time ever"
+  // counter, so navigating Prev/Next through a set you finished days ago still
+  // builds today's count, same as reviewing old material in a spaced-rep app.
+  recordAnswerToday();
   refreshCounterHeader();
   headerScore();
   const c=counts();
@@ -170,11 +176,7 @@ function render(){
   var sab=document.getElementById('seeAnsBtn');
   if(sab)sab.onclick=function(){setRevealed(qIdx,!isRevealed(qIdx));renderSide();render();};
   if(st.answers[qIdx]!==null){feedbackOn()?showFeedback():markSelection();}
-  else if(isRevealed(qIdx)){
-    countRevealedOnce(qIdx);
-    refreshCounterHeader(); // may have just bumped today's count
-    showRevealed();
-  }
+  else if(isRevealed(qIdx))showRevealed();
 }
 
 // ============================================================================
