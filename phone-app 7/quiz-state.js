@@ -81,6 +81,18 @@ function toggleRevealAll(){
   st.revealAll=!st.revealAll;
   saveState();renderSide();render();
 }
+// Reading a revealed answer (via "See answer" or "Show all answers") still
+// doesn't count as an attempt — st.answers/accuracy stay untouched, so scores
+// stay honest per canReveal()'s comment above. But it's still real study
+// activity, so it counts once per question toward the daily streak/total the
+// first time that question is viewed in a revealed state this session.
+function countRevealedOnce(qIdx){
+  if(!st.revealCounted)st.revealCounted={};
+  if(st.revealCounted[qIdx])return;
+  st.revealCounted[qIdx]=1;
+  recordAnswerToday();
+  saveState();
+}
 function counts(){
   let ans=0,right=0;
   st.answers.forEach(function(v,i){if(v!==null){ans++;if(v===QUESTIONS[i].a)right++;}});

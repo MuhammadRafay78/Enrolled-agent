@@ -164,7 +164,7 @@ function render(){
   var sab=document.getElementById('seeAnsBtn');
   if(sab)sab.onclick=function(){setRevealed(qIdx,!isRevealed(qIdx));renderSide();render();};
   if(st.answers[qIdx]!==null){feedbackOn()?showFeedback():markSelection();}
-  else if(isRevealed(qIdx))showRevealed();
+  else if(isRevealed(qIdx)){countRevealedOnce(qIdx);showRevealed();}
 }
 
 // ============================================================================
