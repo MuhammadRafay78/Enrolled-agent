@@ -476,7 +476,9 @@ function wireBookqScoped(n,root){
   root.querySelectorAll('[data-bqn="'+n+'"]').forEach(function(b){
     b.onclick=function(){
       var i=+b.dataset.bq, j=+b.dataset.opt, q=qs[i];
-      var s=bqState(); s[n+':'+i]=j; bqSave(s);
+      var s=bqState(); var firstAnswer=(s[n+':'+i]===undefined||s[n+':'+i]===null);
+      s[n+':'+i]=j; bqSave(s);
+      if(firstAnswer)recordAnswerToday();
       var wrap=document.getElementById('bq-'+n+'-'+i);
       wrap.querySelectorAll('.bqopt').forEach(function(o,k){
         o.disabled=true; o.classList.remove('correct','wrong','dim');
