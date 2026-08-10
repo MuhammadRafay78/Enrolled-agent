@@ -408,6 +408,11 @@ function wireBookqScoped(n,root){
     };
   });
 }
+// Collapsible headers (summary/forms/key numbers/each detail section) — same
+// shape as showNotes' single-chapter view, but every id carries the unit
+// number so multiple chapters' collapse state can coexist in one DOM.
+// notesSecOpen/notesSecSetOpen (defined above) are already keyed by
+// PART+unit+name, so no changes needed there — only the DOM ids here.
 function chapterBlockHTML(n){
   var u=CHNOTES[PART][n];
   var h='<section class="chbk" id="chbk-'+n+'" data-unit="'+n+'">';
@@ -417,8 +422,14 @@ function chapterBlockHTML(n){
   if(fcCount){
     h+='<button type="button" class="fcstart" data-fcunit="'+n+'"><span class="fcstart-ico">🧠</span><span class="fcstart-t"><b>Flashcards for this chapter</b><br><span style="color:var(--muted);font-size:12.5px">Forms, key numbers &amp; deadlines — '+fcCount+' card'+(fcCount===1?'':'s')+'</span></span><span class="fcstart-go">→</span></button>';
   }
-  h+='<h3 class="nh">🧭 Chapter summary</h3>'+chapterSummaryHTML(u);
-  h+='<h3 class="nh">📄 Forms in this chapter</h3>';
+  // summary
+  var summaryOpen=notesSecOpen(n,'summary');
+  h+='<button type="button" class="nh sechead" id="sechead-'+n+'-summary" data-secn="summary"><span>🧭 Chapter summary</span><span class="chev">'+(summaryOpen?'▾':'▸')+'</span></button>';
+  h+='<div class="secbody" id="secbody-'+n+'-summary" style="display:'+(summaryOpen?'block':'none')+'">'+chapterSummaryHTML(u)+'</div>';
+  // forms
+  var formsOpen=notesSecOpen(n,'forms');
+  h+='<button type="button" class="nh sechead" id="sechead-'+n+'-forms" data-secn="forms"><span>📄 Forms in this chapter</span><span class="chev">'+(formsOpen?'▾':'▸')+'</span></button>';
+  h+='<div class="secbody" id="secbody-'+n+'-forms" style="display:'+(formsOpen?'block':'none')+'">';
   if(u.f.length){
     h+='<table class="ntable"><tr><th class="form-col">Form</th><th>Official title</th><th>What it is for</th></tr>';
     u.f.forEach(function(f){
@@ -428,13 +439,23 @@ function chapterBlockHTML(n){
     });
     h+='</table>';
   } else h+='<p style="color:var(--muted)">No forms referenced in this chapter.</p>';
-  h+='<h3 class="nh">🔢 Key numbers, thresholds &amp; deadlines</h3>';
+  h+='</div>';
+  // key numbers
+  var numsOpen=notesSecOpen(n,'nums');
+  h+='<button type="button" class="nh sechead" id="sechead-'+n+'-nums" data-secn="nums"><span>🔢 Key numbers, thresholds &amp; deadlines</span><span class="chev">'+(numsOpen?'▾':'▸')+'</span></button>';
+  h+='<div class="secbody" id="secbody-'+n+'-nums" style="display:'+(numsOpen?'block':'none')+'">';
   if(u.k.length){
     h+='<ul class="nlist">'+u.k.map(function(x){return '<li>'+esc(x.t)+'<div class="nsrc">'+esc(x.sec)+'</div></li>';}).join('')+'</ul>';
   } else h+='<p style="color:var(--muted)">No specific thresholds listed in this chapter.</p>';
-  h+='<h3 class="nh">📚 Detailed notes</h3>';
+  h+='</div>';
+  // detailed notes — each section collapsible on its own, plus a bulk toggle
+  var anyDetailOpen=u.s.some(function(s,i){return notesSecOpen(n,'s'+i);});
+  h+='<div class="nh" style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span>📚 Detailed notes</span>'+
+     '<button type="button" class="mpill" data-toggleall="'+n+'" style="padding:4px 12px">'+(anyDetailOpen?'Collapse all':'Expand all')+'</button></div>';
   u.s.forEach(function(s,i){
-    h+='<div class="nsec" id="chbk-'+n+'-s'+i+'"><div class="'+(s.l===3?'nsub':'nsec-h')+'">'+esc(s.t)+'</div>';
+    var open=notesSecOpen(n,'s'+i);
+    h+='<div class="nsec" id="chbk-'+n+'-s'+i+'"><button type="button" class="'+(s.l===3?'nsub':'nsec-h')+'" data-secn="s'+i+'"><span>'+esc(s.t)+'</span><span class="chev">'+(open?'▾':'▸')+'</span></button>';
+    h+='<div class="secbody" id="secbody-'+n+'-s'+i+'" style="display:'+(open?'block':'none')+'">';
     var exBuf=[];
     function flushEx(){
       if(!exBuf.length)return;
@@ -451,7 +472,7 @@ function chapterBlockHTML(n){
       else h+='<p>'+esc(t)+'</p>';
     });
     flushEx();
-    h+='</div>';
+    h+='</div></div>';
   });
   h+='<div id="bookqwrap-'+n+'">'+bookqHTMLScoped(n)+'</div>';
   h+='</section><div class="chbk-div"><span>End of Study Unit '+n+'</span></div>';
@@ -463,12 +484,76 @@ function wireChapterBlock(n){
   var fcBtn=root.querySelector('[data-fcunit="'+n+'"]');
   if(fcBtn)fcBtn.onclick=function(){ startChapterFlashcards(n,function(){ showNotesBook(n); }); };
   wireBookqScoped(n,root);
+  var u=CHNOTES[PART][n];
+  root.querySelectorAll('[data-secn]').forEach(function(b){
+    b.onclick=function(){
+      var key=b.dataset.secn;
+      var open=!notesSecOpen(n,key);
+      notesSecSetOpen(n,key,open);
+      var body=document.getElementById('secbody-'+n+'-'+key), chev=b.querySelector('.chev');
+      if(body)body.style.display=open?'block':'none';
+      if(chev)chev.textContent=open?'▾':'▸';
+      refreshToggleAllLabel(n);
+    };
+  });
+  var toggleAllBtn=root.querySelector('[data-toggleall="'+n+'"]');
+  if(toggleAllBtn)toggleAllBtn.onclick=function(){
+    var anyOpen=u.s.some(function(s,i){return notesSecOpen(n,'s'+i);});
+    var openTo=!anyOpen;
+    u.s.forEach(function(s,i){
+      notesSecSetOpen(n,'s'+i,openTo);
+      var body=document.getElementById('secbody-'+n+'-s'+i), head=root.querySelector('[data-secn="s'+i+'"]');
+      if(body)body.style.display=openTo?'block':'none';
+      if(head){var chev=head.querySelector('.chev');if(chev)chev.textContent=openTo?'▾':'▸';}
+    });
+    toggleAllBtn.textContent=openTo?'Collapse all':'Expand all';
+  };
+}
+function refreshToggleAllLabel(n){
+  var root=document.getElementById('chbk-'+n), toggleAllBtn=root&&root.querySelector('[data-toggleall="'+n+'"]');
+  if(!toggleAllBtn)return;
+  var u=CHNOTES[PART][n];
+  var anyOpen=u.s.some(function(s,i){return notesSecOpen(n,'s'+i);});
+  toggleAllBtn.textContent=anyOpen?'Collapse all':'Expand all';
+}
+// Opens a collapsed summary/forms/nums/section (used when jumping to it via
+// search or the side panel, matching notesJumpTo in the single-chapter view —
+// landing on a collapsed header with nothing visible below it is no good).
+function openChapterSection(n,key){
+  if(notesSecOpen(n,key))return;
+  notesSecSetOpen(n,key,true);
+  var body=document.getElementById('secbody-'+n+'-'+key);
+  if(body)body.style.display='block';
+  var root=document.getElementById('chbk-'+n), btn=root&&root.querySelector('[data-secn="'+key+'"]');
+  var chev=btn&&btn.querySelector('.chev');
+  if(chev)chev.textContent='▾';
+  refreshToggleAllLabel(n);
+}
+// Side-panel contents for jumping *within* the chapter currently in view —
+// summary/forms/key numbers/study questions/section list, same set the
+// single-chapter view's own side panel (notesIndex) offers. Re-rendered
+// whenever the active chapter changes so it always reflects what's on screen.
+function notesBookChapterJumpHTML(n){
+  var u=CHNOTES[PART][n];
+  var h='<div class="side-hd" style="position:sticky;top:-12px">SU '+n+' — Contents</div>';
+  h+='<button class="side-btn" data-jumpsec="summary">🧭 Summary</button>';
+  h+='<button class="side-btn" data-jumpsec="forms">📄 Forms ('+u.f.length+')</button>';
+  h+='<button class="side-btn" data-jumpsec="nums">🔢 Key numbers ('+u.k.length+')</button>';
+  if(BOOKQ[PART]&&BOOKQ[PART][n]&&BOOKQ[PART][n].length)
+    h+='<button class="side-btn" data-jumpsec="bookq">📝 Study questions ('+BOOKQ[PART][n].length+')</button>';
+  h+='<div style="margin-top:8px;font-size:12px;color:var(--muted)">Sections</div>';
+  u.s.forEach(function(s,i){
+    h+='<button class="side-btn" data-jumpsec="s'+i+'" style="text-align:left;font-size:12.5px;padding:7px 9px'+(s.l===3?';padding-left:18px':'')+'">'+esc(s.t)+'</button>';
+  });
+  return h;
 }
 function notesBookIndex(order,activeUnit){
-  var C=CHNOTES[PART];
-  var h='<button class="side-close" id="sideClose">✕ Close</button><div class="side-hd">'+PARTS[PART].name+' — Chapters</div>';
+  var h='<button class="side-close" id="sideClose">✕ Close</button>';
+  h+='<div id="bookChapterJump">'+notesBookChapterJumpHTML(activeUnit)+'</div>';
+  h+='<div style="margin:14px 0 10px;border-top:1px solid var(--border)"></div>';
+  h+='<div class="side-hd" style="position:sticky;top:-12px">'+esc(PARTS[PART].name)+' — Chapters</div>';
   order.forEach(function(n){
-    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+'" data-jumpchapter="'+n+'" style="text-align:left">SU '+n+': '+esc(C[n].t)+'</button>';
+    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+'" data-jumpchapter="'+n+'" style="text-align:left">SU '+n+': '+esc(CHNOTES[PART][n].t)+'</button>';
   });
   h+='<button class="side-btn" id="notesBookBack" style="margin-top:10px">← Chapter list</button>';
   return h;
@@ -496,6 +581,21 @@ function showNotesBook(startUnit){
   setFloatBack(back,'← Chapter list');
   side.innerHTML=notesBookIndex(order,startUnit);
   wireChapterBlock(startUnit);
+  var lastActiveUnit=startUnit;
+  wireChapterJumpBox(document.getElementById('bookChapterJump'),startUnit);
+
+  // Keeps the header, the "Chapters" highlight, and the within-chapter jump
+  // list (Summary/Forms/Key numbers/Sections) all pointed at whichever
+  // chapter is actually on screen — called both as you scroll and on an
+  // explicit jump, so the side panel never shows the wrong chapter's sections.
+  function updateActiveChapterUI(n){
+    if(n===lastActiveUnit)return;
+    lastActiveUnit=n;
+    document.getElementById('counter').textContent='SU '+n+': '+C[n].t+' — Chapter Notes';
+    side.querySelectorAll('[data-jumpchapter]').forEach(function(b){b.classList.toggle('on',b.dataset.jumpchapter===n);});
+    var jumpBox=document.getElementById('bookChapterJump');
+    if(jumpBox){ jumpBox.innerHTML=notesBookChapterJumpHTML(n); wireChapterJumpBox(jumpBox,n); }
+  }
 
   // Re-observing after appending chapters fires an "initial state" callback
   // reflecting wherever the page is scrolled *right now* — which, for a jump
@@ -513,9 +613,7 @@ function showNotesBook(startUnit){
       if(Date.now()-lastJumpAt<800)return;
       entries.forEach(function(e){
         if(!e.isIntersecting)return;
-        var n=e.target.dataset.hd;
-        document.getElementById('counter').textContent='SU '+n+': '+C[n].t+' — Chapter Notes';
-        side.querySelectorAll('[data-jumpchapter]').forEach(function(b){b.classList.toggle('on',b.dataset.jumpchapter===n);});
+        updateActiveChapterUI(e.target.dataset.hd);
       });
     // Top-anchored band, not centered: a heading scrolled to the top of the
     // viewport (natural reading, or a scrollIntoView({block:'start'}) jump)
@@ -552,19 +650,32 @@ function showNotesBook(startUnit){
   },{rootMargin:'800px 0px 800px 0px'});
   BOOK_IO.observe(document.getElementById('chbkSentinel'));
 
-  // Jump to a specific chapter (and, if given, one of its sections), loading
-  // whatever chapters between here and there haven't been appended yet. A
-  // chapter before the book's start unit was never (and won't be) loaded
-  // forward, so land there by restarting the book at that earlier chapter.
-  function goToBookTarget(n,secIdx){
+  // Jump to a specific chapter and, if given, a target within it — a numeric
+  // section index (search results), an "s<i>" key (side-panel section list),
+  // or "summary"/"forms"/"nums"/"bookq" (side-panel top-level jumps). Loads
+  // whatever chapters between here and there haven't been appended yet, and
+  // opens the target if it's currently collapsed. A chapter before the book's
+  // start unit was never (and won't be) loaded forward, so land there by
+  // restarting the book at that earlier chapter.
+  function goToBookTarget(n,key){
     var idx=order.indexOf(n);
     if(idx<startIdx){ showNotesBook(n); return; }
+    if(typeof key==='number')key='s'+key;
     lastJumpAt=Date.now();
     ensureLoadedThrough(idx);
-    document.getElementById('counter').textContent='SU '+n+': '+C[n].t+' — Chapter Notes';
-    side.querySelectorAll('[data-jumpchapter]').forEach(function(x){x.classList.toggle('on',x.dataset.jumpchapter===n);});
-    var el=document.getElementById(secIdx!=null?('chbk-'+n+'-s'+secIdx):('chbk-'+n));
+    updateActiveChapterUI(n);
+    var el;
+    if(key==null) el=document.getElementById('chbk-'+n);
+    else if(key==='bookq') el=document.getElementById('bookqwrap-'+n);
+    else if(/^s\d+$/.test(key)){ openChapterSection(n,key); el=document.getElementById('chbk-'+n+'-'+key); }
+    else { openChapterSection(n,key); el=document.getElementById('sechead-'+n+'-'+key); }
     scrollToEl(el);
+  }
+  function wireChapterJumpBox(box,n){
+    if(!box)return;
+    box.querySelectorAll('[data-jumpsec]').forEach(function(b){
+      b.onclick=function(){ side.classList.remove('open'); goToBookTarget(n,b.dataset.jumpsec); };
+    });
   }
   side.querySelectorAll('[data-jumpchapter]').forEach(function(b){
     b.onclick=function(){ side.classList.remove('open'); goToBookTarget(b.dataset.jumpchapter,null); };
