@@ -152,9 +152,31 @@ function _sectionGist(s){
 function _highlightNums(text){
   return esc(text).replace(/\$[\d,]+(?:\.\d+)?|\b\d+(?:\.\d+)?%/g,function(m){return '<b>'+m+'</b>';});
 }
+// A key number's .sec tag has to match a section's .t title verbatim to
+// land in that section's summary bullet — but source extraction sometimes
+// tags one with a numbering prefix the section title carries ("3) Married
+// Filing Separately...") or a smart-vs-straight quote the title doesn't
+// (curly ' vs '), so an otherwise-real match silently fails string equality
+// and the number just vanishes from the summary. Normalize both sides
+// before comparing so formatting noise can't cost a real match.
+function _normalizeSecLabel(s){
+  return String(s||'')
+    .replace(/^\s*\d+\)\s*/,'')
+    .replace(/[‘’]/g,"'")
+    .replace(/[“”]/g,'"')
+    .trim();
+}
 function chapterSummaryHTML(u){
-  var byTitle={};
-  u.k.forEach(function(x){ (byTitle[x.sec]=byTitle[x.sec]||[]).push(x.t); });
+  var titleBySec={};
+  u.s.forEach(function(s){ titleBySec[_normalizeSecLabel(s.t)]=s.t; });
+  var byTitle={}, unmatched=[];
+  u.k.forEach(function(x){
+    var real=titleBySec[_normalizeSecLabel(x.sec)];
+    if(real)(byTitle[real]=byTitle[real]||[]).push(x.t);
+    else unmatched.push(x.t); // e.g. numbers sourced from the end-of-chapter
+    // review questions rather than a detailed-notes section — still real,
+    // still worth surfacing, just with nowhere else in this list to attach to.
+  });
   var h='<p style="color:var(--muted);font-size:13px;margin-bottom:10px">A quick pass through every topic in this chapter, numbers included — the full notes below go deeper.</p><ul class="nsum-list">';
   u.s.forEach(function(s){
     var gist=_sectionGist(s);
@@ -163,6 +185,9 @@ function chapterSummaryHTML(u){
        (nums.length?'<ul class="nsum-nums">'+nums.map(function(t){return '<li>'+_highlightNums(t)+'</li>';}).join('')+'</ul>':'')+
        '</li>';
   });
+  if(unmatched.length){
+    h+='<li><b>Also worth knowing</b><ul class="nsum-nums">'+unmatched.map(function(t){return '<li>'+_highlightNums(t)+'</li>';}).join('')+'</ul></li>';
+  }
   h+='</ul>';
   return h;
 }
