@@ -391,6 +391,50 @@ function localBundle(){
 }
 // Merge rule: for each key the newer timestamp wins. Progress is per-exam, so two
 // devices working on different exams both keep their work.
+//
+// Two keys break that assumption: ea3quiz_v2_daily (the streak log) and
+// ea3quiz_time (the automatic study-time tracker) are single shared blobs
+// that every device increments locally as you use the app — the app never
+// re-reads the server's copy before adding to them mid-session. If device A
+// answers questions today and syncs, then device B (still holding its own
+// older local copy of the same blob) ticks even one more second of study
+// time or answers one more question, B's write timestamp becomes the newer
+// one and — under plain "newest wins" — B's whole blob replaces A's on the
+// server, silently erasing A's day. Counters can only go up, never down, so
+// instead of picking a winner these two are merged per-day (per-key within
+// the day) by taking the max on each side — the result is always at least
+// as complete as either device's own local data, on both sides afterward.
+var MERGE_MAX_KEYS={ 'ea3quiz_v2_daily':1, 'ea3quiz_time':1 };
+function _mergeCounterDict(a,b){
+  var out={};
+  Object.keys(a||{}).forEach(function(k){out[k]=a[k];});
+  Object.keys(b||{}).forEach(function(k){out[k]=Math.max(out[k]||0,b[k]||0);});
+  return out;
+}
+function _mergeSyncedValue(key,aStr,bStr){
+  if(key==='ea3quiz_v2_daily'){
+    var a={},b={};
+    try{a=JSON.parse(aStr)||{};}catch(e){}
+    try{b=JSON.parse(bStr)||{};}catch(e){}
+    return JSON.stringify(_mergeCounterDict(a,b));
+  }
+  // ea3quiz_time: {parts,units,topics,days} are flat day/id -> count dicts,
+  // merged the same way; sets is keyed by exam/chapter with a {s:seconds,label} shape.
+  var empty={parts:{},sets:{},units:{},topics:{},days:{}};
+  var a=empty,b=empty;
+  try{a=Object.assign({},empty,JSON.parse(aStr));}catch(e){}
+  try{b=Object.assign({},empty,JSON.parse(bStr));}catch(e){}
+  var out={parts:_mergeCounterDict(a.parts,b.parts),units:_mergeCounterDict(a.units,b.units),
+    topics:_mergeCounterDict(a.topics,b.topics),days:_mergeCounterDict(a.days,b.days),sets:{}};
+  var setKeys={};
+  Object.keys(a.sets||{}).forEach(function(k){setKeys[k]=1;});
+  Object.keys(b.sets||{}).forEach(function(k){setKeys[k]=1;});
+  Object.keys(setKeys).forEach(function(k){
+    var av=(a.sets&&a.sets[k])||{s:0}, bv=(b.sets&&b.sets[k])||{s:0};
+    out.sets[k]={s:Math.max(av.s||0,bv.s||0), label:av.label||bv.label};
+  });
+  return JSON.stringify(out);
+}
 async function syncNow(force){
   if(!SUPA.url||!SUPA.key||!auth())return;
   var _quiet=(force==='quiet');
@@ -408,6 +452,14 @@ async function syncNow(force){
     var changed=false;
     Object.keys(keys).forEach(function(k){
       var L=local[k], R=remote[k];
+      if(MERGE_MAX_KEYS[k]&&L&&R&&L.v!==R.v){
+        var merged=_mergeSyncedValue(k,L.v,R.v);
+        var t=Math.max(L.t,R.t)+1;
+        try{ Storage.prototype.setItem.call(localStorage,k,merged); }catch(e){}
+        m[k]=t; changed=true;
+        push.push({k:k,v:merged,t:t});
+        return;
+      }
       if(L&&(!R||L.t>R.t)) push.push({k:k,v:L.v,t:L.t});
       else if(R&&(!L||R.t>L.t)){
         try{ localStorage.setItem(k,R.v); }catch(e){}
