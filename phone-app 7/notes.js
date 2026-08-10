@@ -468,7 +468,7 @@ function notesBookIndex(order,activeUnit){
   var C=CHNOTES[PART];
   var h='<button class="side-close" id="sideClose">✕ Close</button><div class="side-hd">'+PARTS[PART].name+' — Chapters</div>';
   order.forEach(function(n){
-    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+'" data-jumpchapter="'+n+'">SU '+n+': '+esc(C[n].t)+'</button>';
+    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+'" data-jumpchapter="'+n+'" style="text-align:left">SU '+n+': '+esc(C[n].t)+'</button>';
   });
   h+='<button class="side-btn" id="notesBookBack" style="margin-top:10px">← Chapter list</button>';
   return h;
