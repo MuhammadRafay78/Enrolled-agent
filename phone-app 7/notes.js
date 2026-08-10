@@ -11,6 +11,14 @@ function notesSecSave(s){try{localStorage.setItem('ea3quiz_notesec',JSON.stringi
 function notesSecKeyFor(unit,name){return PART+':'+unit+':'+name;}
 function notesSecOpen(unit,name){var v=notesSecState()[notesSecKeyFor(unit,name)];return v!==false;} // default: open
 function notesSecSetOpen(unit,name,open){var s=notesSecState();s[notesSecKeyFor(unit,name)]=open;notesSecSave(s);}
+// "I'm weak on this chapter, come back to it" flags — one per part, synced
+// across devices like the rest of study progress (unlike notesSecState
+// above, this isn't a display preference, so it isn't device-local).
+function weakKey(){return 'ea3quiz_weak_p'+PART;}
+function weakState(){try{return JSON.parse(localStorage.getItem(weakKey()))||{};}catch(e){return {};}}
+function weakSave(s){try{localStorage.setItem(weakKey(),JSON.stringify(s));}catch(e){}}
+function isWeakChapter(unit){return !!weakState()[unit];}
+function setWeakChapter(unit,weak){var s=weakState();if(weak)s[unit]=true;else delete s[unit];weakSave(s);}
 function scrollToEl(el){
   if(!el)return;
   try{
@@ -500,8 +508,10 @@ function wireBookqScoped(n,root){
 function chapterBlockHTML(n){
   var u=CHNOTES[PART][n];
   var h='<section class="chbk" id="chbk-'+n+'" data-unit="'+n+'">';
+  var weak=isWeakChapter(n);
   h+='<div class="chbk-hd" data-hd="'+n+'"><h2 style="margin:0 0 2px">SU '+n+': '+esc(u.t)+'</h2>'+
      '<p style="color:var(--muted);font-size:13px;margin:0">Complete notes from your '+PARTS[PART].name+' study guide — forms, thresholds, rules'+(u.ex?', and worked examples':'')+'.</p></div>';
+  h+='<button type="button" class="wkflag'+(weak?' on':'')+'" data-wkunit="'+n+'">'+(weak?'🚩 Flagged as weak — tap to clear':'🏳️ Flag this chapter as weak')+'</button>';
   var fcCount=(typeof chapterCardCount==='function')?chapterCardCount(n):0;
   if(fcCount){
     h+='<button type="button" class="fcstart" data-fcunit="'+n+'"><span class="fcstart-ico">🧠</span><span class="fcstart-t"><b>Flashcards for this chapter</b><br><span style="color:var(--muted);font-size:12.5px">Forms, key numbers &amp; deadlines — '+fcCount+' card'+(fcCount===1?'':'s')+'</span></span><span class="fcstart-go">→</span></button>';
@@ -568,6 +578,22 @@ function wireChapterBlock(n){
   var fcBtn=root.querySelector('[data-fcunit="'+n+'"]');
   if(fcBtn)fcBtn.onclick=function(){ startChapterFlashcards(n,function(){ showNotesBook(n); }); };
   wireBookqScoped(n,root);
+  var wkBtn=root.querySelector('[data-wkunit="'+n+'"]');
+  if(wkBtn)wkBtn.onclick=function(){
+    var weak=!isWeakChapter(n);
+    setWeakChapter(n,weak);
+    wkBtn.classList.toggle('on',weak);
+    wkBtn.textContent=weak?'🚩 Flagged as weak — tap to clear':'🏳️ Flag this chapter as weak';
+    // Keep the TOC drawer's chapter-list flag icon (if the side panel is
+    // currently showing one for this chapter) in sync without re-rendering
+    // the whole panel.
+    var chBtn=side.querySelector('[data-jumpchapter="'+n+'"]');
+    if(chBtn){
+      var mark=chBtn.querySelector('.wkmark');
+      if(weak&&!mark){ chBtn.insertAdjacentHTML('afterbegin','<span class="wkmark">🚩 </span>'); }
+      else if(!weak&&mark){ mark.remove(); }
+    }
+  };
   var u=CHNOTES[PART][n];
   root.querySelectorAll('[data-secn]').forEach(function(b){
     b.onclick=function(){
@@ -637,7 +663,7 @@ function notesBookIndex(order,activeUnit){
   h+='<div style="margin:14px 0 10px;border-top:1px solid var(--border)"></div>';
   h+='<div class="side-hd" style="position:sticky;top:-12px">'+esc(PARTS[PART].name)+' — Chapters</div>';
   order.forEach(function(n){
-    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+'" data-jumpchapter="'+n+'" style="text-align:left">SU '+n+': '+esc(CHNOTES[PART][n].t)+'</button>';
+    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+'" data-jumpchapter="'+n+'" style="text-align:left">'+(isWeakChapter(n)?'<span class="wkmark">🚩 </span>':'')+'SU '+n+': '+esc(CHNOTES[PART][n].t)+'</button>';
   });
   h+='<button class="side-btn" id="notesBookBack" style="margin-top:10px">← Chapter list</button>';
   return h;
@@ -809,7 +835,7 @@ function notesUnitList(){
   Object.keys(C).sort(function(a,b){return a-b;}).forEach(function(n){
     var u=C[n];
     var nq=(BOOKQ[PART]&&BOOKQ[PART][n])?BOOKQ[PART][n].length:0;
-    h+='<button class="opt" data-nu="'+n+'"><b>SU '+n+': '+esc(u.t)+'</b><br><span style="color:var(--muted);font-size:13px">'+u.s.length+' sections · '+u.f.length+' forms · '+u.k.length+' key numbers'+(nq?' · '+nq+' study questions':'')+'</span></button>';
+    h+='<button class="opt'+(isWeakChapter(n)?' weak':'')+'" data-nu="'+n+'"><b>'+(isWeakChapter(n)?'🚩 ':'')+'SU '+n+': '+esc(u.t)+'</b><br><span style="color:var(--muted);font-size:13px">'+u.s.length+' sections · '+u.f.length+' forms · '+u.k.length+' key numbers'+(nq?' · '+nq+' study questions':'')+'</span></button>';
   });
   h+='<div class="nav2"><button class="navbtn" id="nulBack">← Exam Menu</button><span></span></div>';
   card.innerHTML=h;
