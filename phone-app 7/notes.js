@@ -234,7 +234,11 @@ function chapterSummaryHTML(u){
   });
   var h='<p style="color:var(--muted);font-size:13px;margin-bottom:10px">A quick pass through every topic in this chapter, numbers included — the full notes below go deeper.</p><ul class="nsum-list">';
   u.s.forEach(function(s){
-    var gist=_sectionGist(s);
+    // s.sum is a hand-written summary, filled in chapter by chapter — actual
+    // explanatory prose rather than a sentence lifted verbatim from the
+    // source text. Falls back to the mechanical extraction below for any
+    // chapter that doesn't have one yet.
+    var gist=s.sum||_sectionGist(s);
     var nums=byTitle[s.t]||[];
     h+='<li'+(s.l===3?' class="nsum-sub"':'')+'><b>'+esc(s.t)+'</b>'+(gist?' — '+esc(gist):'')+
        (nums.length?'<ul class="nsum-nums">'+nums.map(function(t){return '<li>'+_highlightNums(t)+'</li>';}).join('')+'</ul>':'')+
