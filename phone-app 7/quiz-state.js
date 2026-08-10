@@ -81,6 +81,18 @@ function toggleRevealAll(){
   st.revealAll=!st.revealAll;
   saveState();renderSide();render();
 }
+// Reading a revealed answer (via "See answer" or "Show all answers") still
+// doesn't count as an attempt — st.answers/accuracy stay untouched, so scores
+// stay honest per canReveal()'s comment above. But it's still real study
+// activity, so it counts once per question toward the daily streak/total the
+// first time that question is viewed in a revealed state this session.
+function countRevealedOnce(qIdx){
+  if(!st.revealCounted)st.revealCounted={};
+  if(st.revealCounted[qIdx])return;
+  st.revealCounted[qIdx]=1;
+  recordAnswerToday();
+  saveState();
+}
 function counts(){
   let ans=0,right=0;
   st.answers.forEach(function(v,i){if(v!==null){ans++;if(v===QUESTIONS[i].a)right++;}});
@@ -509,6 +521,15 @@ function streakTotal(){
     d.setDate(d.getDate()-1);
   }
   return total;
+}
+// " · 🔥 12 today · 4-day streak" — appended to the quiz header (#counter) while
+// attempting questions, separate from the exam countdown (#score), so you can
+// watch today's count/streak move live as you go through a mock or practice
+// set without leaving the quiz to check the main menu.
+function todayStreakSuffix(){
+  var t=todayCount(); if(!t)return '';
+  var s=currentStreak();
+  return ' · 🔥 '+t+' today'+(s>1?' · '+s+'-day streak':'');
 }
 
 // ============================================================================

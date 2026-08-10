@@ -246,7 +246,9 @@ function wireBookq(n){
   card.querySelectorAll('[data-bq]').forEach(function(b){
     b.onclick=function(){
       var i=+b.dataset.bq, j=+b.dataset.opt, q=qs[i];
-      var s=bqState(); s[n+':'+i]=j; bqSave(s);
+      var s=bqState(); var firstAnswer=(s[n+':'+i]===undefined||s[n+':'+i]===null);
+      s[n+':'+i]=j; bqSave(s);
+      if(firstAnswer)recordAnswerToday();
       var wrap=document.getElementById('bq'+i);
       wrap.querySelectorAll('.bqopt').forEach(function(o,k){
         o.disabled=true;

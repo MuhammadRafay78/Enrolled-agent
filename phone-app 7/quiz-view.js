@@ -87,11 +87,17 @@ function fmtExpl(s){
   }
   return out;
 }
+// examName() + position + " · 🔥 N today · Nd streak" — kept in one place since
+// several call sites (render, revealing an answer, picking one) each need to
+// refresh it the moment today's count changes, not just on the next render.
+function refreshCounterHeader(){
+  document.getElementById('counter').textContent=examName()+' — Question '+(pos+1)+' of '+QUESTIONS.length+todayStreakSuffix();
+}
 function render(){
   markView('quiz',{exam:exam,pos:pos,mch:MCH,chap:CHAP,xch:XCH});
   if(st&&st.pos!==pos){st.pos=pos;saveState();}
   setFloatBack(goBack,'← Back');
-  document.getElementById('counter').textContent=examName()+' — Question '+(pos+1)+' of '+QUESTIONS.length;
+  refreshCounterHeader();
   headerScore();
   const c=counts();
   document.getElementById('prog').style.width=(c.ans/QUESTIONS.length*100)+'%';
@@ -164,7 +170,11 @@ function render(){
   var sab=document.getElementById('seeAnsBtn');
   if(sab)sab.onclick=function(){setRevealed(qIdx,!isRevealed(qIdx));renderSide();render();};
   if(st.answers[qIdx]!==null){feedbackOn()?showFeedback():markSelection();}
-  else if(isRevealed(qIdx))showRevealed();
+  else if(isRevealed(qIdx)){
+    countRevealedOnce(qIdx);
+    refreshCounterHeader(); // may have just bumped today's count
+    showRevealed();
+  }
 }
 
 // ============================================================================
@@ -239,7 +249,7 @@ function pick(dispJ){
   const qIdx=st.order[pos],Q=QUESTIONS[qIdx],perm=getPerm(qIdx);
   const orig=perm[dispJ];
   if(st.mode==='exam'&&!st.examDone){
-    st.answers[qIdx]=orig;recordAnswerToday();recordAttempt(Q,orig);saveState();markSelection();renderSide();headerScore();
+    st.answers[qIdx]=orig;recordAnswerToday();recordAttempt(Q,orig);saveState();markSelection();renderSide();headerScore();refreshCounterHeader();
     const c=counts();document.getElementById('prog').style.width=(c.ans/QUESTIONS.length*100)+'%';
     return;
   }
@@ -248,7 +258,7 @@ function pick(dispJ){
   updateSrs(refOf(qIdx),orig===Q.a);
   recordAnswerToday();
   recordAttempt(Q,orig);
-  saveState();renderSide();showFeedback();headerScore();
+  saveState();renderSide();showFeedback();headerScore();refreshCounterHeader();
   const c=counts();document.getElementById('prog').style.width=(c.ans/QUESTIONS.length*100)+'%';
 }
 
