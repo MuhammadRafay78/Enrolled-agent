@@ -251,7 +251,7 @@ function chapterSummaryHTML(u){
     // where a table genuinely reads clearer than another paragraph of prose.
     var gist=s.sum||_sectionGist(s);
     var nums=byTitle[s.t]||[];
-    h+='<li'+(s.l===3?' class="nsum-sub"':'')+'><b>'+esc(s.t)+'</b>'+(gist?' — '+esc(gist):'')+
+    h+='<li'+(s.l===3?' class="nsum-sub"':'')+'><b>'+esc(s.t)+'</b>'+(gist?' — '+(s.sum?_highlightNums(gist):esc(gist)):'')+
        (s.sumTable||'')+
        (nums.length?'<ul class="nsum-nums">'+nums.map(function(t){return '<li>'+_highlightNums(t)+'</li>';}).join('')+'</ul>':'')+
        '</li>';
