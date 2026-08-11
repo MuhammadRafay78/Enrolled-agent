@@ -97,12 +97,11 @@ function render(){
   markView('quiz',{exam:exam,pos:pos,mch:MCH,chap:CHAP,xch:XCH});
   if(st&&st.pos!==pos){st.pos=pos;saveState();}
   setFloatBack(goBack,'← Back');
-  // Every time a question is displayed here counts toward today's total/streak
-  // — including revisiting one you already answered or already revealed. This
-  // is a "went through it" counter, not an "answered for the first time ever"
-  // counter, so navigating Prev/Next through a set you finished days ago still
-  // builds today's count, same as reviewing old material in a spaced-rep app.
-  recordAnswerToday();
+  // Every question displayed here counts toward today's total/streak once per
+  // set-opening — including one you already answered or already revealed —
+  // but going Q2 -> Q1 within the same sitting doesn't recount Q1; only
+  // reopening the set later does (see resetSessionSeen() call sites).
+  countQuestionOnce(st.order[pos]);
   refreshCounterHeader();
   headerScore();
   const c=counts();
@@ -251,14 +250,14 @@ function pick(dispJ){
   const qIdx=st.order[pos],Q=QUESTIONS[qIdx],perm=getPerm(qIdx);
   const orig=perm[dispJ];
   if(st.mode==='exam'&&!st.examDone){
-    st.answers[qIdx]=orig;recordAnswerToday();recordAttempt(Q,orig);saveState();markSelection();renderSide();headerScore();refreshCounterHeader();
+    st.answers[qIdx]=orig;countQuestionOnce(qIdx);recordAttempt(Q,orig);saveState();markSelection();renderSide();headerScore();refreshCounterHeader();
     const c=counts();document.getElementById('prog').style.width=(c.ans/QUESTIONS.length*100)+'%';
     return;
   }
   if(st.answers[qIdx]!==null)return;
   st.answers[qIdx]=orig;
   updateSrs(refOf(qIdx),orig===Q.a);
-  recordAnswerToday();
+  countQuestionOnce(qIdx);
   recordAttempt(Q,orig);
   saveState();renderSide();showFeedback();headerScore();refreshCounterHeader();
   const c=counts();document.getElementById('prog').style.width=(c.ans/QUESTIONS.length*100)+'%';

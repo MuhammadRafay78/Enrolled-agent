@@ -479,6 +479,22 @@ function recordAnswerToday(){
   log[k]=(log[k]||0)+1;
   try{localStorage.setItem(DAILY_KEY,JSON.stringify(log));}catch(e){}
 }
+// A question counts toward today's total at most once per "opening" of a
+// quiz set — not once per Next/Prev click. resetSessionSeen() is called by
+// every start*()/jumpTo() that launches or resumes a set (a genuine "open"),
+// so going Q2 -> Q1 within one sitting doesn't inflate the count, but leaving
+// back to the menu and re-entering the same set later starts a fresh,
+// re-countable pass. Deliberately in-memory only (not persisted) — a page
+// reload is as good as reopening. Keyed by plain qIdx: every reset site also
+// reassigns QUESTIONS to the new set's array, so indices from a previous set
+// can't collide with the new one.
+var SESSION_SEEN={};
+function resetSessionSeen(){ SESSION_SEEN={}; }
+function countQuestionOnce(qIdx){
+  if(SESSION_SEEN[qIdx])return;
+  SESSION_SEEN[qIdx]=1;
+  recordAnswerToday();
+}
 function todayCount(){ return dailyLog()[estDate()]||0; }
 // Lifetime count of answers logged, used to measure how many questions were
 // attempted during a given Start/Stop timer session (session count = delta of this).

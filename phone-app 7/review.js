@@ -4,6 +4,7 @@
 function startReview(){
   const due=dueReview();
   if(!due.length)return;
+  resetSessionSeen();
   exam=-2;
   QUESTIONS=due.map(function(d){return d.q;});
   REVIEW_REFS=due.map(function(d){return d.ref;});
@@ -50,6 +51,7 @@ function collectWrong(){
 function startFlaggedReview(){
   var items=collectFlagged();
   if(!items.length){ alert('No flagged questions in this Part yet. Flag questions using the ⚑ button while answering.'); return; }
+  resetSessionSeen();
   exam=-6;
   QUESTIONS=items.map(function(d){return d.q;});
   REVIEW_REFS=items.map(function(d){return d.ref;});
@@ -60,6 +62,7 @@ function startFlaggedReview(){
 function startWrongReview(){
   var items=collectWrong();
   if(!items.length){ alert('No wrong answers in this Part yet. Attempt some questions first!'); return; }
+  resetSessionSeen();
   exam=-7;
   QUESTIONS=items.map(function(d){return d.q;});
   REVIEW_REFS=items.map(function(d){return d.ref;});
@@ -82,6 +85,7 @@ function startShuffledWrongFlagged(){
     var j=Math.floor(Math.random()*(i+1));
     var tmp=combined[i]; combined[i]=combined[j]; combined[j]=tmp;
   }
+  resetSessionSeen();
   exam=-9;
   QUESTIONS=combined.map(function(d){return d.q;});
   REVIEW_REFS=combined.map(function(d){return d.ref;});
@@ -446,6 +450,7 @@ async function startToughestForMe(){
   if(originalSubEl) originalSubEl.textContent = originalSub;
   if(!items.length){ items = pool.slice(0, 25); }
 
+  resetSessionSeen();
   exam = -10;
   QUESTIONS = items.map(function(d){ return d.q; });
   REVIEW_REFS = items.map(function(d){ return d.ref; });
