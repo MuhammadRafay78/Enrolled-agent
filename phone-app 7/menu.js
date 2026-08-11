@@ -417,6 +417,7 @@ function renderSearch(term){
 }
 function startSearchQuiz(hits, term){
   if(!hits||!hits.length)return;
+  resetSessionSeen();
   exam=-8;
   QUESTIONS=hits.map(function(h){return h.q;});
   REVIEW_REFS=hits.map(function(h){
@@ -432,6 +433,7 @@ function startSearchQuiz(hits, term){
 function jumpTo(e,qi){
   let s=loadState(e);
   if(!s){s=makeState(EXAMS[e].questions.length,EXAMS[e].questions,false,'practice');}
+  resetSessionSeen();
   exam=e;st=s;QUESTIONS=EXAMS[e].questions;saveState();
   pos=st.order.indexOf(qi);if(pos<0)pos=0;
   enterQuiz();
@@ -448,7 +450,7 @@ function jumpMcq(ci,qi){
 // ---------- start / reset ----------
 function startFlow(e){
   const s=loadState(e);
-  if(s){exam=e;st=s;QUESTIONS=EXAMS[e].questions;
+  if(s){resetSessionSeen();exam=e;st=s;QUESTIONS=EXAMS[e].questions;
     pos=resumePos(st);
     enterQuiz();return;}
   showChooser(e);
@@ -464,6 +466,7 @@ function showChooser(e){
     '<div class="nav2" style="margin-top:14px"><button class="navbtn" id="backMenu">← Back</button><span></span></div>';
   const go=function(mode){
     const shuf=document.getElementById('shufCheck').checked;
+    resetSessionSeen();
     exam=e;QUESTIONS=EXAMS[e].questions;
     st=makeState(QUESTIONS.length,QUESTIONS,shuf,mode);
     pos=0;saveState();enterQuiz();
@@ -548,6 +551,7 @@ function gState(i){
   }catch(e){ return null; }
 }
 function startGleim(i){
+  resetSessionSeen();
   exam=-11; GCH=i;
   QUESTIONS=GLEIM_CH[i].questions; REVIEW_REFS=[];
   st=gState(i)||makeState(QUESTIONS.length,QUESTIONS,false,'practice');
@@ -611,6 +615,7 @@ function xState(i){
   }catch(e){return null;}
 }
 function startExtra(i){
+  resetSessionSeen();
   exam=-5;XCH=i;
   QUESTIONS=XTRA[i].questions;REVIEW_REFS=[];
   st=xState(i)||makeState(QUESTIONS.length,QUESTIONS,false,'practice');
@@ -662,6 +667,7 @@ function mcqState(i){
   return null;
 }
 function startMcq(i){
+  resetSessionSeen();
   exam=-4;MCH=i;
   QUESTIONS=MCQS[i].questions;REVIEW_REFS=[];
   st=mcqState(i)||makeState(QUESTIONS.length,QUESTIONS,false,'practice');
@@ -692,6 +698,7 @@ function chapState(ui){
   return null;
 }
 function startChapter(u){
+  resetSessionSeen();
   exam=-3;CHAP=u;
   const unit=UNITS[u];
   QUESTIONS=unit.items.map(function(it){return EXAMS[it.e].questions[it.i];});
