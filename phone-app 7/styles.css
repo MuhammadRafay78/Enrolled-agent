@@ -200,6 +200,17 @@
     .ntable:not(.sheet) td:last-child{border-bottom:none;}
     .ntable:not(.sheet) td::before{content:attr(data-label);display:block;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);margin-bottom:2px;}
     .ntable:not(.sheet) td:empty::before{content:none;}
+    /* The first cell of each row is that row's subject (a form name, a
+       feature being compared, a filing status, etc.) — the thing the rest
+       of the row's labeled fields are about. Its own column header is often
+       blank in hand-authored comparison tables (there's nothing to call a
+       "Feature" column), so with no distinct styling it rendered as a bare
+       line of body text sitting flush against the bold-labeled fields below
+       it — no visual cue that a new row/card had started. Give it a title
+       treatment instead: bold, a hair larger, tinted background, and always
+       suppress its (often-empty) label rather than showing a blank gap. */
+    .ntable:not(.sheet) td:first-child{background:var(--bg);font-weight:700;font-size:14.5px;}
+    .ntable:not(.sheet) td:first-child::before{content:none;}
   }
   .fbook{margin-top:6px;padding:6px 9px;background:#f8fafc;border-left:3px solid var(--border);font-size:12.5px;color:#475569;line-height:1.5;}
   body.is-dark .fbook{background:#1c2739;color:#b8c4d4;}
