@@ -274,6 +274,7 @@ function showNotes(n,backFn){
   document.getElementById('prog').style.width='0%';
   side.classList.add('active');side.classList.remove('open');document.body.classList.add('inquiz');
   markView('notes',{unit:n});
+  recordSummaryReviewed(PART,n);
   side.innerHTML=notesIndex(n);
 
   var h='<div class="nsearchwrap"><input class="nsearch" id="noteSearch" placeholder="🔍 Search chapter"></div>'+
@@ -690,6 +691,7 @@ function showNotesBook(startUnit){
   var order=chapterUnitOrder();
   var startIdx=order.indexOf(startUnit); if(startIdx<0)startIdx=0;
   markView('notesbook',{unit:startUnit});
+  recordSummaryReviewed(PART,startUnit);
   side.classList.add('active');side.classList.remove('open');document.body.classList.add('inquiz');
   document.getElementById('counter').textContent='SU '+startUnit+': '+C[startUnit].t+' — Chapter Notes';
   document.getElementById('score').textContent='Study guide';
@@ -715,6 +717,7 @@ function showNotesBook(startUnit){
   function updateActiveChapterUI(n){
     if(n===lastActiveUnit)return;
     lastActiveUnit=n;
+    recordSummaryReviewed(PART,n);
     document.getElementById('counter').textContent='SU '+n+': '+C[n].t+' — Chapter Notes';
     side.querySelectorAll('[data-jumpchapter]').forEach(function(b){b.classList.toggle('on',b.dataset.jumpchapter===n);});
     var jumpBox=document.getElementById('bookChapterJump');

@@ -404,12 +404,41 @@ function localBundle(){
 // instead of picking a winner these two are merged per-day (per-key within
 // the day) by taking the max on each side — the result is always at least
 // as complete as either device's own local data, on both sides afterward.
-var MERGE_MAX_KEYS={ 'ea3quiz_v2_daily':1, 'ea3quiz_time':1 };
+// ea3quiz_v2_summary_daily and ea3quiz_v2_summary_reviewed (the chapter-notes
+// review streak) have the same cross-device problem as the two above, so they
+// get the same per-day/per-chapter union treatment rather than newest-wins.
+var MERGE_MAX_KEYS={ 'ea3quiz_v2_daily':1, 'ea3quiz_time':1, 'ea3quiz_v2_summary_daily':1, 'ea3quiz_v2_summary_reviewed':1 };
 function _mergeCounterDict(a,b){
   var out={};
   Object.keys(a||{}).forEach(function(k){out[k]=a[k];});
   Object.keys(b||{}).forEach(function(k){out[k]=Math.max(out[k]||0,b[k]||0);});
   return out;
+}
+// {part: {unit:1,...}} — union the reviewed-chapter sets under each part
+// rather than taking either side wholesale, so a chapter reviewed only on
+// device A isn't lost when device B's write timestamp happens to be newer.
+function _mergeNestedSet(a,b){
+  var out={};
+  Object.keys(a||{}).forEach(function(pk){out[pk]=Object.assign({},a[pk]);});
+  Object.keys(b||{}).forEach(function(pk){out[pk]=Object.assign({},out[pk]||{},b[pk]);});
+  return out;
+}
+// {day: {total,seen:{"part_unit":1,...}}} — union each day's seen-set (not
+// max the totals) so two devices reviewing different chapters on the same
+// day both get counted, then total is recomputed from the merged set.
+function _mergeSummaryDaily(aStr,bStr){
+  var a={},b={};
+  try{a=JSON.parse(aStr)||{};}catch(e){}
+  try{b=JSON.parse(bStr)||{};}catch(e){}
+  var days={};
+  Object.keys(a).forEach(function(k){days[k]=1;});
+  Object.keys(b).forEach(function(k){days[k]=1;});
+  var out={};
+  Object.keys(days).forEach(function(k){
+    var seen=Object.assign({},(a[k]||{}).seen,(b[k]||{}).seen);
+    out[k]={total:Object.keys(seen).length,seen:seen};
+  });
+  return JSON.stringify(out);
 }
 function _mergeSyncedValue(key,aStr,bStr){
   if(key==='ea3quiz_v2_daily'){
@@ -417,6 +446,13 @@ function _mergeSyncedValue(key,aStr,bStr){
     try{a=JSON.parse(aStr)||{};}catch(e){}
     try{b=JSON.parse(bStr)||{};}catch(e){}
     return JSON.stringify(_mergeCounterDict(a,b));
+  }
+  if(key==='ea3quiz_v2_summary_daily') return _mergeSummaryDaily(aStr,bStr);
+  if(key==='ea3quiz_v2_summary_reviewed'){
+    var a2={},b2={};
+    try{a2=JSON.parse(aStr)||{};}catch(e){}
+    try{b2=JSON.parse(bStr)||{};}catch(e){}
+    return JSON.stringify(_mergeNestedSet(a2,b2));
   }
   // ea3quiz_time: {parts,units,topics,days} are flat day/id -> count dicts,
   // merged the same way; sets is keyed by exam/chapter with a {s:seconds,label} shape.
