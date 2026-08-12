@@ -404,10 +404,11 @@ function localBundle(){
 // instead of picking a winner these two are merged per-day (per-key within
 // the day) by taking the max on each side — the result is always at least
 // as complete as either device's own local data, on both sides afterward.
-// ea3quiz_v2_summary_daily and ea3quiz_v2_summary_reviewed (the chapter-notes
-// review streak) have the same cross-device problem as the two above, so they
-// get the same per-day/per-chapter union treatment rather than newest-wins.
-var MERGE_MAX_KEYS={ 'ea3quiz_v2_daily':1, 'ea3quiz_time':1, 'ea3quiz_v2_summary_daily':1, 'ea3quiz_v2_summary_reviewed':1 };
+// ea3quiz_v2_summary_daily, ea3quiz_v2_summary_reviewed, and
+// ea3quiz_v2_summary_cycles (the chapter-notes review streak + full-part
+// revision counter) have the same cross-device problem as the two above, so
+// they get the same union-based treatment rather than newest-wins.
+var MERGE_MAX_KEYS={ 'ea3quiz_v2_daily':1, 'ea3quiz_time':1, 'ea3quiz_v2_summary_daily':1, 'ea3quiz_v2_summary_reviewed':1, 'ea3quiz_v2_summary_cycles':1 };
 function _mergeCounterDict(a,b){
   var out={};
   Object.keys(a||{}).forEach(function(k){out[k]=a[k];});
@@ -453,6 +454,26 @@ function _mergeSyncedValue(key,aStr,bStr){
     try{a2=JSON.parse(aStr)||{};}catch(e){}
     try{b2=JSON.parse(bStr)||{};}catch(e){}
     return JSON.stringify(_mergeNestedSet(a2,b2));
+  }
+  // {part: {count,current:{unit:1,...}}} — count can only go up (max), and
+  // the in-progress lap's touched-chapter set is unioned like the reviewed
+  // set above. If that union happens to already cover every chapter, the
+  // app's own read path (summaryCycleCount) rolls it over into a completed
+  // lap the next time it's checked — this merge doesn't need to know how
+  // many chapters a Part has to stay safe.
+  if(key==='ea3quiz_v2_summary_cycles'){
+    var a3={},b3={};
+    try{a3=JSON.parse(aStr)||{};}catch(e){}
+    try{b3=JSON.parse(bStr)||{};}catch(e){}
+    var parts={};
+    Object.keys(a3).forEach(function(pk){parts[pk]=1;});
+    Object.keys(b3).forEach(function(pk){parts[pk]=1;});
+    var outCycles={};
+    Object.keys(parts).forEach(function(pk){
+      var pa=a3[pk]||{count:0,current:{}}, pb=b3[pk]||{count:0,current:{}};
+      outCycles[pk]={count:Math.max(pa.count||0,pb.count||0),current:Object.assign({},pa.current,pb.current)};
+    });
+    return JSON.stringify(outCycles);
   }
   // ea3quiz_time: {parts,units,topics,days} are flat day/id -> count dicts,
   // merged the same way; sets is keyed by exam/chapter with a {s:seconds,label} shape.

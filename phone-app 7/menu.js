@@ -209,6 +209,8 @@ function showMenu(){
   var _notesPct=_notesY?Math.round(_notesX/_notesY*100):0;
   var _notesStreak=summaryCurrentStreak(), _notesWeek=summaryWindowCount(7);
   var _notesStreakStr = _notesStreak>0 ? ('🔥 '+_notesStreak+'-day streak') : 'Open a chapter\'s notes to start';
+  var _notesCycles=_notesY?summaryCycleCount(PART,_notesY):0;
+  var _notesLapProgress=_notesY?summaryCycleCurrentCount(PART):0;
   html+='<div class="mstats">'+
     '<div class="mstat"><div class="lbl">Answered</div><div class="val">'+ansAll.toLocaleString()+
       '<small> / '+totalQ.toLocaleString()+'</small></div><div class="mbar"><i style="width:'+(totalQ?Math.round(ansAll/totalQ*100):0)+'%"></i></div></div>'+
@@ -220,9 +222,18 @@ function showMenu(){
       '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+_streakStr+'</div></div>'+
     '<div class="mstat"><div class="lbl">Streak total</div><div class="val" style="color:'+(_streakTot?'#059669':'var(--muted)')+'">'+_streakTot.toLocaleString()+'</div>'+
       '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+_streakSubline+'</div></div>'+
-    (_notesY?('<div class="mstat"><div class="lbl">Notes reviewed</div><div class="val">'+_notesX+
+  '</div>';
+
+  // Chapter-notes review stats get their own labeled, always-2-across group
+  // rather than folding into the 3-column grid above — five question-stat
+  // cards already read fine at 3-per-row (3+2), but stretching that grid to
+  // seven left an orphaned single card on mobile and on wide screens alike.
+  if(_notesY)html+='<div class="mgrouphd"><span>📘 Notes review</span></div><div class="mgrid2">'+
+    '<div class="mstat"><div class="lbl">Notes reviewed</div><div class="val">'+_notesX+
       '<small> / '+_notesY+'</small></div><div class="mbar"><i style="width:'+_notesPct+'%"></i></div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+_notesStreakStr+(_notesWeek?' · '+_notesWeek+' this week':'')+'</div></div>'):'')+
+      '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+_notesStreakStr+(_notesWeek?' · '+_notesWeek+' this week':'')+'</div></div>'+
+    '<div class="mstat"><div class="lbl">Full revisions</div><div class="val" style="color:'+(_notesCycles?'#7c3aed':'var(--muted)')+'">'+_notesCycles+'</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+(_notesLapProgress?_notesLapProgress+' of '+_notesY+' toward the next':'Every chapter once = 1 revision')+'</div></div>'+
   '</div>';
 
   if(totalQ)html+='<input class="searchbox" id="searchBox" placeholder="🔍 Search all '+totalQ.toLocaleString()+' questions by keyword or topic…"><div id="sres"></div>';
