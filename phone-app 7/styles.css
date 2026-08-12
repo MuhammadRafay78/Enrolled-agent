@@ -23,6 +23,10 @@
   .opt.correct{border-color:var(--green);background:var(--green-bg);}
   .opt.wrong{border-color:var(--red);background:var(--red-bg);}
   .opt.dim{opacity:.55;}
+  /* Chapter-notes reviewed — whole card tinted green; declared before .weak so
+     a chapter that's both reviewed and flagged weak keeps the red border (the
+     flag is the more actionable signal) with the green tint showing through. */
+  .opt.reviewed{border-color:var(--green);background:var(--green-bg);}
   .opt.weak{border-color:var(--red);}
   /* "I'm weak on this chapter" flag toggle, shown at the top of a chapter in
      the book view, and its read-only echo (.wkmark) in the chapter list and
@@ -75,8 +79,10 @@
   .qn.cur{outline:2px solid var(--blue);}
   .side-btn{display:block;width:100%;margin-top:8px;padding:7px;border:1px solid var(--border);border-radius:8px;background:var(--card);cursor:pointer;font-size:12.5px;color:var(--ink);}
   .side-btn:hover{border-color:var(--blue);}
-  /* Read-only "chapter notes reviewed" checkmark — chapter list, book-view TOC drawer */
-  .revmark{color:var(--green);font-weight:700;}
+  /* Chapter-notes reviewed — whole entry tinted green, book-view TOC drawer.
+     Declared before .side-btn.on so the current-chapter highlight (blue)
+     still wins when a chapter is both active and already reviewed. */
+  .side-btn.reviewed{background:var(--green-bg);border-color:var(--green);color:var(--green);font-weight:600;}
   .reset-mini{border:1px solid var(--border);border-radius:10px;background:var(--card);cursor:pointer;font-size:18px;padding:0 14px;color:var(--muted);}
   .reset-mini:hover{color:var(--red);border-color:var(--red);}
   .nav2{display:flex;justify-content:space-between;margin-top:20px;}

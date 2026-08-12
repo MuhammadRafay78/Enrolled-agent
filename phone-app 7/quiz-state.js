@@ -558,7 +558,7 @@ function summaryReviewedAll(){
 function summaryReviewedCount(part){
   return Object.keys(summaryReviewedAll()[part]||{}).length;
 }
-function recordSummaryReviewed(part,unit){
+function recordSummaryReviewed(part,unit,totalChapters){
   var all=summaryReviewedAll();
   var p=all[part]||(all[part]={});
   var isFirstEver=!p[unit];
@@ -574,8 +574,60 @@ function recordSummaryReviewed(part,unit){
     p[unit]=1;
     try{localStorage.setItem(SUMMARY_REVIEWED_KEY,JSON.stringify(all));}catch(e){}
   }
+  recordSummaryCycleTouch(part,unit,totalChapters);
 }
 function summaryTodayCount(){ return (summaryDailyLog()[estDate()]||{}).total||0; }
+// ---- full-part "revision" cycles ----
+// How many times every chapter in a Part has been touched at least once,
+// start to finish, since the last time that happened. Reuses the same
+// "opening a chapter's notes" event as the tracking above, but counts
+// differently: a chapter that's new to the *current* lap fills it in; once
+// every chapter has been touched since the last completed lap, the count
+// for that Part goes up and a fresh lap starts. Reopening a chapter already
+// in the current lap — same day or ten days later — doesn't advance it;
+// every chapter has to be touched again to complete the next lap. A lap can
+// span multiple days/sessions, same as the example that prompted this: do
+// half a part's chapters today and the rest tomorrow, that's still one lap.
+var SUMMARY_CYCLES_KEY='ea3quiz_v2_summary_cycles';
+function summaryCyclesAll(){
+  try{return JSON.parse(localStorage.getItem(SUMMARY_CYCLES_KEY))||{};}catch(e){return {};}
+}
+function _summaryCyclesSave(all){
+  try{localStorage.setItem(SUMMARY_CYCLES_KEY,JSON.stringify(all));}catch(e){}
+}
+// If the current lap is already full — which can happen right after a
+// cross-device sync merges progress from both sides — roll it over. Keeps a
+// lap from getting stuck "full" without ever being counted.
+function _summaryCycleRollover(part,totalChapters){
+  var all=summaryCyclesAll();
+  var p=all[part];
+  if(!p||!totalChapters)return p;
+  if(Object.keys(p.current||{}).length>=totalChapters){
+    p.count=(p.count||0)+1; p.current={};
+    _summaryCyclesSave(all);
+  }
+  return p;
+}
+function recordSummaryCycleTouch(part,unit,totalChapters){
+  if(!totalChapters)return;
+  var all=summaryCyclesAll();
+  var p=all[part]||(all[part]={count:0,current:{}});
+  if(!p.current[unit]){
+    p.current[unit]=1;
+    _summaryCyclesSave(all);
+  }
+  _summaryCycleRollover(part,totalChapters);
+}
+function summaryCycleCount(part,totalChapters){
+  var p=_summaryCycleRollover(part,totalChapters);
+  return (p&&p.count)||0;
+}
+// How many distinct chapters have been touched toward the *current*, not-yet-
+// complete lap — e.g. "12 of 19" while partway through another full pass.
+function summaryCycleCurrentCount(part){
+  var p=summaryCyclesAll()[part];
+  return (p&&Object.keys(p.current||{}).length)||0;
+}
 function summaryCurrentStreak(){
   var log=summaryDailyLog(); var streak=0;
   var d=new Date();

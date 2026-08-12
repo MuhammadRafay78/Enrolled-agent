@@ -274,7 +274,7 @@ function showNotes(n,backFn){
   document.getElementById('prog').style.width='0%';
   side.classList.add('active');side.classList.remove('open');document.body.classList.add('inquiz');
   markView('notes',{unit:n});
-  recordSummaryReviewed(PART,n);
+  recordSummaryReviewed(PART,n,Object.keys(C).length);
   side.innerHTML=notesIndex(n);
 
   var h='<div class="nsearchwrap"><input class="nsearch" id="noteSearch" placeholder="🔍 Search chapter"></div>'+
@@ -679,7 +679,7 @@ function notesBookIndex(order,activeUnit){
   h+='<div class="side-hd" style="position:sticky;top:-12px">'+esc(PARTS[PART].name)+' — Chapters</div>';
   var reviewedSet=summaryReviewedAll()[PART]||{};
   order.forEach(function(n){
-    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+'" data-jumpchapter="'+n+'" style="text-align:left">'+(isWeakChapter(n)?'<span class="wkmark">🚩 </span>':'')+(reviewedSet[n]?'<span class="revmark">✓ </span>':'')+'SU '+n+': '+esc(CHNOTES[PART][n].t)+'</button>';
+    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+(reviewedSet[n]?' reviewed':'')+'" data-jumpchapter="'+n+'" style="text-align:left">'+(isWeakChapter(n)?'<span class="wkmark">🚩 </span>':'')+'SU '+n+': '+esc(CHNOTES[PART][n].t)+'</button>';
   });
   h+='<button class="side-btn" id="notesBookBack" style="margin-top:10px">← Chapter list</button>';
   return h;
@@ -692,7 +692,7 @@ function showNotesBook(startUnit){
   var order=chapterUnitOrder();
   var startIdx=order.indexOf(startUnit); if(startIdx<0)startIdx=0;
   markView('notesbook',{unit:startUnit});
-  recordSummaryReviewed(PART,startUnit);
+  recordSummaryReviewed(PART,startUnit,Object.keys(C).length);
   side.classList.add('active');side.classList.remove('open');document.body.classList.add('inquiz');
   document.getElementById('counter').textContent='SU '+startUnit+': '+C[startUnit].t+' — Chapter Notes';
   document.getElementById('score').textContent='Study guide';
@@ -718,16 +718,13 @@ function showNotesBook(startUnit){
   function updateActiveChapterUI(n){
     if(n===lastActiveUnit)return;
     lastActiveUnit=n;
-    recordSummaryReviewed(PART,n);
+    recordSummaryReviewed(PART,n,Object.keys(C).length);
     document.getElementById('counter').textContent='SU '+n+': '+C[n].t+' — Chapter Notes';
     side.querySelectorAll('[data-jumpchapter]').forEach(function(b){b.classList.toggle('on',b.dataset.jumpchapter===n);});
-    // Reflect the review that recordSummaryReviewed() just logged: give this
-    // chapter's TOC entry a ✓ immediately, without re-rendering the whole list.
+    // Reflect the review that recordSummaryReviewed() just logged: mark this
+    // chapter's TOC entry reviewed immediately, without re-rendering the list.
     var jumpBtn=side.querySelector('[data-jumpchapter="'+n+'"]');
-    if(jumpBtn&&!jumpBtn.querySelector('.revmark')){
-      var wk=jumpBtn.querySelector('.wkmark');
-      jumpBtn.insertAdjacentHTML(wk?'afterend':'afterbegin','<span class="revmark">✓ </span>');
-    }
+    if(jumpBtn)jumpBtn.classList.add('reviewed');
     var jumpBox=document.getElementById('bookChapterJump');
     if(jumpBox){ jumpBox.innerHTML=notesBookChapterJumpHTML(n); wireChapterJumpBox(jumpBox,n); }
   }
@@ -861,7 +858,7 @@ function notesUnitList(){
   Object.keys(C).sort(function(a,b){return a-b;}).forEach(function(n){
     var u=C[n];
     var nq=(BOOKQ[PART]&&BOOKQ[PART][n])?BOOKQ[PART][n].length:0;
-    h+='<button class="opt'+(isWeakChapter(n)?' weak':'')+'" data-nu="'+n+'"><b>'+(isWeakChapter(n)?'🚩 ':'')+'SU '+n+': '+esc(u.t)+'</b><br><span style="color:var(--muted);font-size:13px">'+u.s.length+' sections · '+u.f.length+' forms · '+u.k.length+' key numbers'+(nq?' · '+nq+' study questions':'')+(reviewedSet[n]?' · <span class="revmark">✓ Reviewed</span>':'')+'</span></button>';
+    h+='<button class="opt'+(isWeakChapter(n)?' weak':'')+(reviewedSet[n]?' reviewed':'')+'" data-nu="'+n+'"><b>'+(isWeakChapter(n)?'🚩 ':'')+'SU '+n+': '+esc(u.t)+'</b><br><span style="color:var(--muted);font-size:13px">'+u.s.length+' sections · '+u.f.length+' forms · '+u.k.length+' key numbers'+(nq?' · '+nq+' study questions':'')+'</span></button>';
   });
   h+='<div class="nav2"><button class="navbtn" id="nulBack">← Exam Menu</button><span></span></div>';
   card.innerHTML=h;
