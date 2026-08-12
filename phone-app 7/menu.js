@@ -203,6 +203,12 @@ function showMenu(){
   var _today=todayCount(), _streak=currentStreak(), _streakTot=streakTotal();
   var _streakStr = _streak>0 ? ('🔥 '+_streak+'-day streak') : 'Answer a question to start a streak';
   var _streakSubline = _streak>0 ? ('over '+_streak+' day'+(_streak===1?'':'s')+' · avg '+Math.round(_streakTot/_streak)+'/day') : 'Not started yet';
+  // ---- chapter-notes review streak (mirrors the question streak above) ----
+  var _notesY=CHNOTES[PART]?Object.keys(CHNOTES[PART]).length:0;
+  var _notesX=_notesY?summaryReviewedCount(PART):0;
+  var _notesPct=_notesY?Math.round(_notesX/_notesY*100):0;
+  var _notesStreak=summaryCurrentStreak(), _notesWeek=summaryWindowCount(7);
+  var _notesStreakStr = _notesStreak>0 ? ('🔥 '+_notesStreak+'-day streak') : 'Open a chapter\'s notes to start';
   html+='<div class="mstats">'+
     '<div class="mstat"><div class="lbl">Answered</div><div class="val">'+ansAll.toLocaleString()+
       '<small> / '+totalQ.toLocaleString()+'</small></div><div class="mbar"><i style="width:'+(totalQ?Math.round(ansAll/totalQ*100):0)+'%"></i></div></div>'+
@@ -214,6 +220,9 @@ function showMenu(){
       '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+_streakStr+'</div></div>'+
     '<div class="mstat"><div class="lbl">Streak total</div><div class="val" style="color:'+(_streakTot?'#059669':'var(--muted)')+'">'+_streakTot.toLocaleString()+'</div>'+
       '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+_streakSubline+'</div></div>'+
+    (_notesY?('<div class="mstat"><div class="lbl">Notes reviewed</div><div class="val">'+_notesX+
+      '<small> / '+_notesY+'</small></div><div class="mbar"><i style="width:'+_notesPct+'%"></i></div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+_notesStreakStr+(_notesWeek?' · '+_notesWeek+' this week':'')+'</div></div>'):'')+
   '</div>';
 
   if(totalQ)html+='<input class="searchbox" id="searchBox" placeholder="🔍 Search all '+totalQ.toLocaleString()+' questions by keyword or topic…"><div id="sres"></div>';
@@ -246,7 +255,7 @@ function showMenu(){
     var nch=Object.keys(CHNOTES[PART]).length;
     var nbq=0; if(BOOKQ[PART])Object.keys(BOOKQ[PART]).forEach(function(k){nbq+=BOOKQ[PART][k].length;});
     chapBits.push('<button class="mwide" id="libBtn"><span class="ic">'+micon('book')+'</span><span class="tx"><span class="nm">Chapter notes</span>'+
-      '<span class="sub">'+nch+' chapters'+(nbq?' · '+nbq+' study questions':'')+'</span></span></button>');
+      '<span class="sub">'+nch+' chapters'+(nbq?' · '+nbq+' study questions':'')+(_notesX?' · '+_notesX+'/'+nch+' reviewed':'')+'</span></span></button>');
   }
   if(chapBits.length)html+='<div class="mgrouphd"><span>By chapter</span></div><div class="mgrid2">'+chapBits.join('')+'</div>';
   if(XTRA.length || (GLEIM_CH&&GLEIM_CH.length)){

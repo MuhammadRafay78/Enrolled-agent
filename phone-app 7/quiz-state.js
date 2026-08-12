@@ -537,3 +537,78 @@ function todayStreakSuffix(){
 }
 
 // ============================================================================
+// ==== CHAPTER-NOTES REVIEW STREAK
+// ============================================================================
+// Same shape as the daily activity log above, but tracks "opened a chapter's
+// notes" instead of "answered a question." A chapter counts toward today's
+// total at most once per day — reopening notes you already reviewed today,
+// or scrolling back past them in the continuous-scroll book view, doesn't
+// inflate the count. Stored under an ea3quiz_ key so it syncs cross-device.
+var SUMMARY_DAILY_KEY='ea3quiz_v2_summary_daily';
+function summaryDailyLog(){
+  try{return JSON.parse(localStorage.getItem(SUMMARY_DAILY_KEY))||{};}catch(e){return {};}
+}
+// Cumulative, never-resets record of which chapters have ever had their notes
+// opened, per Part — drives the "X of Y chapters reviewed" progress bar
+// (independent of the daily log, which resets its dedup set each day).
+var SUMMARY_REVIEWED_KEY='ea3quiz_v2_summary_reviewed';
+function summaryReviewedAll(){
+  try{return JSON.parse(localStorage.getItem(SUMMARY_REVIEWED_KEY))||{};}catch(e){return {};}
+}
+function summaryReviewedCount(part){
+  return Object.keys(summaryReviewedAll()[part]||{}).length;
+}
+function recordSummaryReviewed(part,unit){
+  var all=summaryReviewedAll();
+  var p=all[part]||(all[part]={});
+  var isFirstEver=!p[unit];
+  var log=summaryDailyLog(); var k=estDate();
+  var day=log[k]||(log[k]={total:0,seen:{}});
+  var dayKey=part+'_'+unit;
+  if(!day.seen[dayKey]){
+    day.seen[dayKey]=1;
+    day.total=(day.total||0)+1;
+    try{localStorage.setItem(SUMMARY_DAILY_KEY,JSON.stringify(log));}catch(e){}
+  }
+  if(isFirstEver){
+    p[unit]=1;
+    try{localStorage.setItem(SUMMARY_REVIEWED_KEY,JSON.stringify(all));}catch(e){}
+  }
+}
+function summaryTodayCount(){ return (summaryDailyLog()[estDate()]||{}).total||0; }
+function summaryCurrentStreak(){
+  var log=summaryDailyLog(); var streak=0;
+  var d=new Date();
+  if(!(log[estDate(d)]&&log[estDate(d)].total>0))return 0;
+  while(true){
+    var k=estDate(d);
+    if(log[k]&&log[k].total>0){streak++;d.setDate(d.getDate()-1);}
+    else break;
+    if(streak>3650)break; // safety
+  }
+  return streak;
+}
+// Total chapter-notes reviews across the current streak's days (inclusive of today)
+function summaryStreakTotal(){
+  var streak=summaryCurrentStreak(); if(!streak)return 0;
+  var log=summaryDailyLog(); var total=0; var d=new Date();
+  for(var i=0;i<streak;i++){
+    var k=estDate(d);
+    total+=(log[k]&&log[k].total)||0;
+    d.setDate(d.getDate()-1);
+  }
+  return total;
+}
+// Total chapter-notes reviews in the trailing N days, inclusive of today —
+// e.g. summaryWindowCount(7) for "reviews this week."
+function summaryWindowCount(days){
+  var log=summaryDailyLog(); var total=0; var d=new Date();
+  for(var i=0;i<days;i++){
+    var k=estDate(d);
+    total+=(log[k]&&log[k].total)||0;
+    d.setDate(d.getDate()-1);
+  }
+  return total;
+}
+
+// ============================================================================
