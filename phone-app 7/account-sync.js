@@ -697,7 +697,16 @@ livePoll();
     await pushOne('ea3quiz_v2_summary_reviewed');
     await pushOne('ea3quiz_v2_summary_cycles');
     var verifyMsg=await verify();
-    alert(verifyMsg);
+    // A visible on-page banner as well as alert() — some browsers/extensions
+    // silently suppress alert() (e.g. after a page has shown several already),
+    // and this repair has to be unmistakable either way.
+    try{
+      var banner=document.createElement('div');
+      banner.textContent=verifyMsg;
+      banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999999;background:#111;color:#fff;padding:16px;font:600 14px/1.5 -apple-system,sans-serif;text-align:center;white-space:pre-wrap;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+      document.body.appendChild(banner);
+    }catch(e){}
+    try{ alert(verifyMsg); }catch(e){}
   })();
 })();
 
