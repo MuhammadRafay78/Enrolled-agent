@@ -207,7 +207,7 @@ function showMenu(){
   var _notesY=CHNOTES[PART]?Object.keys(CHNOTES[PART]).length:0;
   var _notesX=_notesY?summaryReviewedCount(PART):0;
   var _notesPct=_notesY?Math.round(_notesX/_notesY*100):0;
-  var _notesStreak=summaryCurrentStreak(), _notesWeek=summaryWindowCount(7);
+  var _notesStreak=summaryCurrentStreak(PART), _notesWeek=summaryWindowCount(7,PART);
   var _notesStreakStr = _notesStreak>0 ? ('🔥 '+_notesStreak+'-day streak') : 'Open a chapter\'s notes to start';
   var _notesCycles=_notesY?summaryCycleCount(PART,_notesY):0;
   var _notesLapProgress=_notesY?summaryCycleCurrentCount(PART):0;
