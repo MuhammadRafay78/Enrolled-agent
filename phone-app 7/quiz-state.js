@@ -563,11 +563,13 @@ function recordSummaryReviewed(part,unit,totalChapters){
   var p=all[part]||(all[part]={});
   var isFirstEver=!p[unit];
   var log=summaryDailyLog(); var k=estDate();
-  var day=log[k]||(log[k]={total:0,seen:{}});
+  var day=log[k]||(log[k]={total:0,seen:{},byPart:{}});
+  if(!day.byPart)day.byPart={};
   var dayKey=part+'_'+unit;
   if(!day.seen[dayKey]){
     day.seen[dayKey]=1;
     day.total=(day.total||0)+1;
+    day.byPart[part]=(day.byPart[part]||0)+1;
     try{localStorage.setItem(SUMMARY_DAILY_KEY,JSON.stringify(log));}catch(e){}
   }
   if(isFirstEver){
@@ -576,7 +578,14 @@ function recordSummaryReviewed(part,unit,totalChapters){
   }
   recordSummaryCycleTouch(part,unit,totalChapters);
 }
-function summaryTodayCount(){ return (summaryDailyLog()[estDate()]||{}).total||0; }
+// `part` is optional on the read side for backward compatibility, but every
+// caller now passes it — each Part's card should only reflect that Part's
+// own review activity, not a total shared across all three Parts.
+function summaryTodayCount(part){
+  var day=summaryDailyLog()[estDate()];
+  if(!day)return 0;
+  return part?(day.byPart&&day.byPart[part])||0:day.total||0;
+}
 // ---- full-part "revision" cycles ----
 // How many times every chapter in a Part has been touched at least once,
 // start to finish, since the last time that happened. Reuses the same
@@ -628,36 +637,40 @@ function summaryCycleCurrentCount(part){
   var p=summaryCyclesAll()[part];
   return (p&&Object.keys(p.current||{}).length)||0;
 }
-function summaryCurrentStreak(){
+function _summaryDayCount(day,part){
+  if(!day)return 0;
+  return part?(day.byPart&&day.byPart[part])||0:day.total||0;
+}
+function summaryCurrentStreak(part){
   var log=summaryDailyLog(); var streak=0;
   var d=new Date();
-  if(!(log[estDate(d)]&&log[estDate(d)].total>0))return 0;
+  if(!(_summaryDayCount(log[estDate(d)],part)>0))return 0;
   while(true){
     var k=estDate(d);
-    if(log[k]&&log[k].total>0){streak++;d.setDate(d.getDate()-1);}
+    if(_summaryDayCount(log[k],part)>0){streak++;d.setDate(d.getDate()-1);}
     else break;
     if(streak>3650)break; // safety
   }
   return streak;
 }
 // Total chapter-notes reviews across the current streak's days (inclusive of today)
-function summaryStreakTotal(){
-  var streak=summaryCurrentStreak(); if(!streak)return 0;
+function summaryStreakTotal(part){
+  var streak=summaryCurrentStreak(part); if(!streak)return 0;
   var log=summaryDailyLog(); var total=0; var d=new Date();
   for(var i=0;i<streak;i++){
     var k=estDate(d);
-    total+=(log[k]&&log[k].total)||0;
+    total+=_summaryDayCount(log[k],part);
     d.setDate(d.getDate()-1);
   }
   return total;
 }
 // Total chapter-notes reviews in the trailing N days, inclusive of today —
-// e.g. summaryWindowCount(7) for "reviews this week."
-function summaryWindowCount(days){
+// e.g. summaryWindowCount(7,PART) for "reviews this week" scoped to one Part.
+function summaryWindowCount(days,part){
   var log=summaryDailyLog(); var total=0; var d=new Date();
   for(var i=0;i<days;i++){
     var k=estDate(d);
-    total+=(log[k]&&log[k].total)||0;
+    total+=_summaryDayCount(log[k],part);
     d.setDate(d.getDate()-1);
   }
   return total;
