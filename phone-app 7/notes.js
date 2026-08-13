@@ -781,7 +781,19 @@ function showNotesBook(startUnit){
   }
   if(BOOK_IO)BOOK_IO.disconnect();
   BOOK_IO=new IntersectionObserver(function(entries){
-    entries.forEach(function(e){ if(e.isIntersecting)ensureLoadedThrough(loadedIdx+1); });
+    entries.forEach(function(e){
+      if(!e.isIntersecting)return;
+      ensureLoadedThrough(loadedIdx+1);
+      // Backstop for the per-heading observer above: its trigger band is a thin
+      // strip near the top of the viewport, which a fast scroll/fling through a
+      // long chapter can jump straight past without ever crossing — especially
+      // for content that gets lazy-appended already behind the current scroll
+      // position. Reaching this sentinel (800px past the end of what's loaded)
+      // reliably means everything loaded so far has been scrolled through, so
+      // mark it all reviewed here too. recordSummaryReviewed is a no-op for a
+      // chapter already recorded, so re-running this on every load is safe.
+      for(var i=startIdx;i<=loadedIdx;i++)recordSummaryReviewed(PART,order[i],Object.keys(C).length);
+    });
   },{rootMargin:'800px 0px 800px 0px'});
   BOOK_IO.observe(document.getElementById('chbkSentinel'));
 
