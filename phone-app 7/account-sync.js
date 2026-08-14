@@ -645,70 +645,40 @@ document.addEventListener('visibilitychange',function(){
 window.addEventListener('focus',function(){ if(auth() && navigator.onLine) syncNow('quiet'); });
 livePoll();
 
-// One-time, URL-triggered repair for a specific reported data-corruption bug:
-// a since-reverted change to the chapter-notes scroll tracker could inflate
-// the "Full revisions" counter every time its sentinel re-fired. Visiting
-// the app with ?repair=p3notes13 in the URL sets Part 3 back to "13/13
-// notes reviewed, 1 full revision, 0 of 13 toward the next" and pushes that
-// straight to the server (bypassing the normal max-merge, which would
-// otherwise keep restoring the inflated count), then reports the
-// server-confirmed result in an alert. Safe to leave in: it's inert unless
-// that exact query param is present.
-(function(){
-  var params;
-  try{ params=new URLSearchParams(location.search); }catch(e){ return; }
-  if(params.get('repair')!=='p3notes13')return;
-  (async function(){
-    if(!auth()){ alert('Not signed in — sign in first, then reload this same link.'); return; }
-    var PART='3', total=13;
-    function apply(){
-      var reviewed=JSON.parse(localStorage.getItem('ea3quiz_v2_summary_reviewed')||'{}');
-      var units={}; for(var i=1;i<=total;i++)units[i]=1;
-      reviewed[PART]=units;
-      localStorage.setItem('ea3quiz_v2_summary_reviewed',JSON.stringify(reviewed));
-      var cycles=JSON.parse(localStorage.getItem('ea3quiz_v2_summary_cycles')||'{}');
-      cycles[PART]={count:1,current:{}};
-      localStorage.setItem('ea3quiz_v2_summary_cycles',JSON.stringify(cycles));
-    }
-    async function pushOne(k){
-      var m=JSON.parse(localStorage.getItem('ea3quiz_meta')||'{}');
-      var v=localStorage.getItem(k), t=m[k]||Date.now();
-      return apiRetry('/rest/v1/progress',{method:'POST',
-        headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
-        body:JSON.stringify([{k:k,v:v,t:t}])});
-    }
-    async function verify(){
-      var r=await apiRetry('/rest/v1/progress?select=k,v,t&k=in.(ea3quiz_v2_summary_reviewed,ea3quiz_v2_summary_cycles)',{method:'GET'});
-      if(!r.ok)return 'verify GET failed: '+r.status;
-      var rows=await r.json(); var out={};
-      rows.forEach(function(row){out[row.k]=row.v;});
-      var reviewedServer={}, cyclesServer={};
-      try{reviewedServer=JSON.parse(out['ea3quiz_v2_summary_reviewed']||'{}');}catch(e){}
-      try{cyclesServer=JSON.parse(out['ea3quiz_v2_summary_cycles']||'{}');}catch(e){}
-      var revCount=Object.keys((reviewedServer[PART]||{})).length;
-      var cyc=cyclesServer[PART]||{count:0,current:{}};
-      return 'SERVER now says: Notes reviewed '+revCount+'/13, Full revisions '+(cyc.count||0)+', '+Object.keys(cyc.current||{}).length+' of 13 toward next.';
-    }
-    apply();
-    await pushOne('ea3quiz_v2_summary_reviewed');
-    await pushOne('ea3quiz_v2_summary_cycles');
-    await new Promise(function(res){setTimeout(res,1500);});
-    apply();
-    await pushOne('ea3quiz_v2_summary_reviewed');
-    await pushOne('ea3quiz_v2_summary_cycles');
-    var verifyMsg=await verify();
-    // A visible on-page banner as well as alert() — some browsers/extensions
-    // silently suppress alert() (e.g. after a page has shown several already),
-    // and this repair has to be unmistakable either way.
-    try{
-      var banner=document.createElement('div');
-      banner.textContent=verifyMsg;
-      banner.style.cssText='position:fixed;top:0;left:0;right:0;z-index:999999;background:#111;color:#fff;padding:16px;font:600 14px/1.5 -apple-system,sans-serif;text-align:center;white-space:pre-wrap;box-shadow:0 2px 10px rgba(0,0,0,.3)';
-      document.body.appendChild(banner);
-    }catch(e){}
-    try{ alert(verifyMsg); }catch(e){}
-  })();
-})();
+// Self-service reset for one Part's chapter-notes "revision" tracking (the
+// current-lap set + "Full revisions" count shown on the Notes-review card).
+// Does NOT touch the permanent, cumulative "X of Y chapters ever reviewed"
+// record — only the lap-progress counters, in case they're ever wrong for
+// any reason (a bug, a cross-device merge oddity, or just wanting to
+// restart the count). Pushes straight to the server, bypassing the normal
+// max-merge that MERGE_MAX_KEYS applies to this key — that merge exists so
+// counters never drop on their own across devices, which is exactly what a
+// deliberate reset needs to override. Returns {ok:true} on success or
+// {ok:false, msg} if not signed in.
+async function resetCyclesForPart(part, totalChapters){
+  if(!auth())return {ok:false, msg:'Not signed in.'};
+  function apply(){
+    var cycles=JSON.parse(localStorage.getItem('ea3quiz_v2_summary_cycles')||'{}');
+    cycles[part]={count:0,current:{}};
+    localStorage.setItem('ea3quiz_v2_summary_cycles',JSON.stringify(cycles));
+  }
+  async function pushOnce(){
+    var m=JSON.parse(localStorage.getItem('ea3quiz_meta')||'{}');
+    var v=localStorage.getItem('ea3quiz_v2_summary_cycles');
+    var t=m['ea3quiz_v2_summary_cycles']||Date.now();
+    return apiRetry('/rest/v1/progress',{method:'POST',
+      headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify([{k:'ea3quiz_v2_summary_cycles',v:v,t:t}])});
+  }
+  apply();
+  await pushOnce();
+  // Re-apply and push again after a short delay, to win any race against a
+  // queued/in-flight background sync that might still be holding the old value.
+  await new Promise(function(res){setTimeout(res,1200);});
+  apply();
+  await pushOnce();
+  return {ok:true};
+}
 
 
 // A name plus a 4-digit PIN is mapped to a hidden account. Supabase needs an email and

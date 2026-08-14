@@ -455,6 +455,8 @@
   .mreset{position:absolute;top:7px;right:7px;border:1px solid var(--border);background:var(--card);color:var(--muted);border-radius:7px;font-size:12px;line-height:1;padding:3px 6px;cursor:pointer;opacity:0;transition:opacity .12s;font-family:inherit;}
   .mcard:hover .mreset,.mreset:focus{opacity:1;}
   .mreset:hover{color:var(--red);border-color:var(--red);}
+  .lbl-reset{display:inline-block;margin-left:3px;color:var(--muted);cursor:pointer;font-size:11px;line-height:1;vertical-align:middle;}
+  .lbl-reset:hover{color:var(--red);}
   .mtile{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 10px;cursor:pointer;text-align:center;font-family:inherit;color:var(--ink);width:100%;}
   .mtile:hover{border-color:var(--blue);}
   .mtile:hover .mi{color:var(--blue);}
