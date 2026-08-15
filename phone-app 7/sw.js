@@ -1,6 +1,6 @@
 // Cache the whole app so it opens instantly and works with no signal.
 // Bump CACHE when the app changes; the old cache is deleted on activate.
-const CACHE = 'ea-prep-v58';
+const CACHE = 'ea-prep-v59';
 const ASSETS = ['./','./index.html','./manifest.webmanifest',
   './styles.css','./ai-tutor.css',
   './data.js','./questions.js','./migration-map.js',
