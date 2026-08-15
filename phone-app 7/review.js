@@ -210,9 +210,21 @@ function collectToughestForMe(limit){
     if(weakChapters[q.unit||'']) { e.score += 3; e.why.weakChap = true; }
     if(weakTopics[q.topic||'']) { e.score += 2; e.why.weakTopic = true; }
     e.score += _textToughFeatures(q.q);
-    // Flashcard confidence: rating 1 or 2 = "still confused"
+    // Flashcard confidence: does this question's chapter have a flashcard the
+    // student rated 1 or 2 ("still confused")? Flashcard ratings are stored
+    // per form/key-number concept (ref like chapfc_p3_5_f0 — see
+    // buildChapterCardPool() in flashcards.js), not per question, so there's
+    // no direct ref to match against e.ref — look up by chapter instead.
     var rating = null;
-    if(fcRatings && e.ref && fcRatings[e.ref] && typeof fcRatings[e.ref].rating === 'number') rating = fcRatings[e.ref].rating;
+    var _fcUnit = (typeof unitNumOf === 'function') ? unitNumOf(q.unit) : null;
+    if(fcRatings && _fcUnit){
+      var _fcPrefix = 'chapfc_p' + PART + '_' + _fcUnit + '_';
+      Object.keys(fcRatings).forEach(function(fk){
+        if(fk.indexOf(_fcPrefix) !== 0) return;
+        var fr = fcRatings[fk] && fcRatings[fk].r;
+        if(typeof fr === 'number' && (rating === null || fr < rating)) rating = fr;
+      });
+    }
     if(rating !== null && rating <= 2) { e.score += 6; e.why.lowConf = true; }
     // Attempt history signals (only present if the student has attempted this question)
     var hist = attempts[_qh(q.q)];
