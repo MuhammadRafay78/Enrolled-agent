@@ -1,7 +1,7 @@
   :root{--bg:#f4f6f9;--card:#fff;--ink:#1a2332;--muted:#64748b;--blue:#2563eb;--green:#16a34a;--green-bg:#f0fdf4;--red:#dc2626;--red-bg:#fef2f2;--border:#e2e8f0;}
   *{box-sizing:border-box;margin:0;padding:0;}
   body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--ink);line-height:1.55;padding:24px 16px;}
-  .wrap{max-width:880px;margin:0 auto;}
+  .wrap{max-width:1180px;margin:0 auto;}
   .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:14px;color:var(--muted);}
   .score-chip{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-weight:600;color:var(--ink);}
   .bar{height:8px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:20px;}
@@ -125,7 +125,7 @@
     .layout{display:block;}
     .card{border:none;box-shadow:none;padding:0;}
     .nh{page-break-after:avoid;}
-    .ntable{page-break-inside:auto;font-size:11px;}
+    .ntable{page-break-inside:auto;font-size:11px;display:table;overflow-x:visible;min-width:0;width:100%;}
     .ntable tr{page-break-inside:avoid;}
     .vlabel{font-size:11px;font-weight:700;color:var(--blue);margin-bottom:6px;line-height:1.3;}
   .vchip{border:1px solid #999;color:#000;background:#f3f3f3;}
@@ -187,7 +187,15 @@
   body.is-dark .nnote{background:#3a2c10;}
   .nlist{margin:4px 0 10px 20px;font-size:14.5px;}
   .nlist li{margin-bottom:5px;line-height:1.55;}
-  .ntable{width:100%;border-collapse:collapse;margin:8px 0 14px;font-size:13.5px;}
+  /* display:block turns the table into a normal block box, which (like any
+     block box) fills its container by default — same visual result as the
+     old plain width:100% for every table that already fits comfortably.
+     overflow-x:auto is what actually matters: it's a no-op until a table
+     needs more room than that (e.g. carries its own min-width, set inline
+     per-table for wide comparison tables like a 5-column credit table) —
+     then it scrolls horizontally instead of squeezing every column into a
+     narrow, wrapped mess. */
+  .ntable{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;border-collapse:collapse;margin:8px 0 14px;font-size:13.5px;}
   .ntable th,.ntable td{border:1px solid var(--border);padding:7px 9px;text-align:left;vertical-align:top;}
   .ntable th{background:#f1f5f9;font-weight:700;}
   body.is-dark .ntable th{background:#243044;}
@@ -504,11 +512,6 @@
        and not others. stretch is what column layout actually needs here. */
     .layout{flex-direction:column;align-items:stretch;}
     .card{padding:16px;border-radius:12px;}
-    /* auto table-layout squeezes whichever column has the shortest words down to
-       near-nothing once the row is wider than the screen (e.g. "Forms in this
-       chapter" — three columns of very different natural widths). Let the row
-       scroll horizontally instead of destroying column readability. */
-    .ntable{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}
     .qtext{font-size:16px;}
     .opt{padding:14px 13px;font-size:15px;margin-bottom:9px;}
     .nav2{gap:10px;position:sticky;bottom:8px;}
