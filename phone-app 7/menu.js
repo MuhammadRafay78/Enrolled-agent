@@ -207,7 +207,7 @@ function showMenu(){
   var _notesY=CHNOTES[PART]?Object.keys(CHNOTES[PART]).length:0;
   var _notesX=_notesY?summaryReviewedCount(PART):0;
   var _notesPct=_notesY?Math.round(_notesX/_notesY*100):0;
-  var _notesStreak=summaryCurrentStreak(), _notesWeek=summaryWindowCount(7);
+  var _notesStreak=summaryCurrentStreak(PART), _notesWeek=summaryWindowCount(7,PART);
   var _notesStreakStr = _notesStreak>0 ? ('🔥 '+_notesStreak+'-day streak') : 'Open a chapter\'s notes to start';
   var _notesCycles=_notesY?summaryCycleCount(PART,_notesY):0;
   var _notesLapProgress=_notesY?summaryCycleCurrentCount(PART):0;
@@ -232,7 +232,7 @@ function showMenu(){
     '<div class="mstat"><div class="lbl">Notes reviewed</div><div class="val">'+_notesX+
       '<small> / '+_notesY+'</small></div><div class="mbar"><i style="width:'+_notesPct+'%"></i></div>'+
       '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+_notesStreakStr+(_notesWeek?' · '+_notesWeek+' this week':'')+'</div></div>'+
-    '<div class="mstat"><div class="lbl">Full revisions</div><div class="val" style="color:'+(_notesCycles?'#7c3aed':'var(--muted)')+'">'+_notesCycles+'</div>'+
+    '<div class="mstat"><div class="lbl">Full revisions'+((_notesCycles||_notesLapProgress)?' <span class="lbl-reset" data-nr="1" title="Reset revision count for this Part">↺</span>':'')+'</div><div class="val" style="color:'+(_notesCycles?'#7c3aed':'var(--muted)')+'">'+_notesCycles+'</div>'+
       '<div style="font-size:11px;color:var(--muted);margin-top:9px">'+(_notesLapProgress?_notesLapProgress+' of '+_notesY+' toward the next':'Every chapter once = 1 revision')+'</div></div>'+
   '</div>';
 
@@ -340,6 +340,7 @@ function showMenu(){
   // ---- wiring ----
   card.querySelectorAll('[data-e]').forEach(function(b){b.onclick=function(){startFlow(+b.dataset.e);};});
   card.querySelectorAll('[data-r]').forEach(function(b){b.onclick=function(ev){ev.stopPropagation();resetExam(+b.dataset.r);};});
+  card.querySelectorAll('[data-nr]').forEach(function(b){b.onclick=function(ev){ev.stopPropagation();resetNotesCycles();};});
   const rb=document.getElementById('reviewBtn'); if(due.length)rb.onclick=startReview;
   var _fbn=document.getElementById('flaggedBtn'); if(_fbn&&_flagCount)_fbn.onclick=startFlaggedReview;
   var _wbn=document.getElementById('wrongBtn'); if(_wbn&&_wrongCount)_wbn.onclick=startWrongReview;
@@ -500,6 +501,16 @@ function resetExam(e){
     try{localStorage.removeItem(skey(e));localStorage.removeItem('ea3quiz_mock_'+e);}catch(err){}
     showMenu();
   }
+}
+// Self-service fix for a wrong "Full revisions" count (e.g. from a past bug,
+// or an odd cross-device merge) — resets just the lap-progress counters for
+// the current Part, not the permanent "chapters ever reviewed" history.
+async function resetNotesCycles(){
+  if(!confirm('Reset the revision count for '+PARTS[PART].name+'? This sets "Full revisions" and current-lap progress back to 0. Your permanent notes-reviewed history is not affected. This cannot be undone.'))return;
+  var totalChapters=CHNOTES[PART]?Object.keys(CHNOTES[PART]).length:0;
+  var r=await resetCyclesForPart(PART,totalChapters);
+  if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+  showMenu();
 }
 
 // ============================================================================

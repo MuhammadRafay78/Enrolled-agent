@@ -455,12 +455,14 @@ function _mergeSyncedValue(key,aStr,bStr){
     try{b2=JSON.parse(bStr)||{};}catch(e){}
     return JSON.stringify(_mergeNestedSet(a2,b2));
   }
-  // {part: {count,current:{unit:1,...}}} — count can only go up (max), and
-  // the in-progress lap's touched-chapter set is unioned like the reviewed
-  // set above. If that union happens to already cover every chapter, the
-  // app's own read path (summaryCycleCount) rolls it over into a completed
-  // lap the next time it's checked — this merge doesn't need to know how
-  // many chapters a Part has to stay safe.
+  // {part: {count,current:{unit:1,...}}} — count can only go up (max). The
+  // in-progress lap's touched-chapter set is unioned ONLY when both sides
+  // are genuinely mid-way through the SAME lap (equal count) — safe to
+  // combine partial progress from two devices there. When counts differ,
+  // the higher-count side just completed (and reset) a lap the other side's
+  // "current" still predates — unioning that stale, nearly-full set back in
+  // would resurrect it into what should be a fresh lap, undoing the reset.
+  // Take the higher-count side's current as-is instead.
   if(key==='ea3quiz_v2_summary_cycles'){
     var a3={},b3={};
     try{a3=JSON.parse(aStr)||{};}catch(e){}
@@ -471,7 +473,11 @@ function _mergeSyncedValue(key,aStr,bStr){
     var outCycles={};
     Object.keys(parts).forEach(function(pk){
       var pa=a3[pk]||{count:0,current:{}}, pb=b3[pk]||{count:0,current:{}};
-      outCycles[pk]={count:Math.max(pa.count||0,pb.count||0),current:Object.assign({},pa.current,pb.current)};
+      var ca=pa.count||0, cb=pb.count||0;
+      var mergedCurrent;
+      if(ca===cb) mergedCurrent=Object.assign({},pa.current,pb.current);
+      else mergedCurrent=Object.assign({},(ca>cb?pa.current:pb.current));
+      outCycles[pk]={count:Math.max(ca,cb),current:mergedCurrent};
     });
     return JSON.stringify(outCycles);
   }
@@ -644,6 +650,41 @@ document.addEventListener('visibilitychange',function(){
 });
 window.addEventListener('focus',function(){ if(auth() && navigator.onLine) syncNow('quiet'); });
 livePoll();
+
+// Self-service reset for one Part's chapter-notes "revision" tracking (the
+// current-lap set + "Full revisions" count shown on the Notes-review card).
+// Does NOT touch the permanent, cumulative "X of Y chapters ever reviewed"
+// record — only the lap-progress counters, in case they're ever wrong for
+// any reason (a bug, a cross-device merge oddity, or just wanting to
+// restart the count). Pushes straight to the server, bypassing the normal
+// max-merge that MERGE_MAX_KEYS applies to this key — that merge exists so
+// counters never drop on their own across devices, which is exactly what a
+// deliberate reset needs to override. Returns {ok:true} on success or
+// {ok:false, msg} if not signed in.
+async function resetCyclesForPart(part, totalChapters){
+  if(!auth())return {ok:false, msg:'Not signed in.'};
+  function apply(){
+    var cycles=JSON.parse(localStorage.getItem('ea3quiz_v2_summary_cycles')||'{}');
+    cycles[part]={count:0,current:{}};
+    localStorage.setItem('ea3quiz_v2_summary_cycles',JSON.stringify(cycles));
+  }
+  async function pushOnce(){
+    var m=JSON.parse(localStorage.getItem('ea3quiz_meta')||'{}');
+    var v=localStorage.getItem('ea3quiz_v2_summary_cycles');
+    var t=m['ea3quiz_v2_summary_cycles']||Date.now();
+    return apiRetry('/rest/v1/progress',{method:'POST',
+      headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify([{k:'ea3quiz_v2_summary_cycles',v:v,t:t}])});
+  }
+  apply();
+  await pushOnce();
+  // Re-apply and push again after a short delay, to win any race against a
+  // queued/in-flight background sync that might still be holding the old value.
+  await new Promise(function(res){setTimeout(res,1200);});
+  apply();
+  await pushOnce();
+  return {ok:true};
+}
 
 
 // A name plus a 4-digit PIN is mapped to a hidden account. Supabase needs an email and

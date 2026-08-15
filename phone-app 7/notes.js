@@ -677,9 +677,12 @@ function notesBookIndex(order,activeUnit){
   h+='<div id="bookChapterJump">'+notesBookChapterJumpHTML(activeUnit)+'</div>';
   h+='<div style="margin:14px 0 10px;border-top:1px solid var(--border)"></div>';
   h+='<div class="side-hd" style="position:sticky;top:-12px">'+esc(PARTS[PART].name)+' — Chapters</div>';
-  var reviewedSet=summaryReviewedAll()[PART]||{};
+  // Current revision lap, not the all-time "ever opened" set — this highlight
+  // is meant to reset each time a full pass through the Part completes, same
+  // as the "Full revisions" counter it's tracking progress toward.
+  var lapSet=(summaryCyclesAll()[PART]||{}).current||{};
   order.forEach(function(n){
-    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+(reviewedSet[n]?' reviewed':'')+'" data-jumpchapter="'+n+'" style="text-align:left">'+(isWeakChapter(n)?'<span class="wkmark">🚩 </span>':'')+'SU '+n+': '+esc(CHNOTES[PART][n].t)+'</button>';
+    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+(lapSet[n]?' reviewed':'')+'" data-jumpchapter="'+n+'" style="text-align:left">'+(isWeakChapter(n)?'<span class="wkmark">🚩 </span>':'')+'SU '+n+': '+esc(CHNOTES[PART][n].t)+'</button>';
   });
   h+='<button class="side-btn" id="notesBookBack" style="margin-top:10px">← Chapter list</button>';
   return h;
@@ -723,8 +726,14 @@ function showNotesBook(startUnit){
     side.querySelectorAll('[data-jumpchapter]').forEach(function(b){b.classList.toggle('on',b.dataset.jumpchapter===n);});
     // Reflect the review that recordSummaryReviewed() just logged: mark this
     // chapter's TOC entry reviewed immediately, without re-rendering the list.
+    // Checked against the actual current-lap set (not unconditional) — if this
+    // touch was the one that completed and reset the lap, nothing should be
+    // marked green anymore, this chapter included.
     var jumpBtn=side.querySelector('[data-jumpchapter="'+n+'"]');
-    if(jumpBtn)jumpBtn.classList.add('reviewed');
+    if(jumpBtn){
+      var _lapNow=(summaryCyclesAll()[PART]||{}).current||{};
+      jumpBtn.classList.toggle('reviewed',!!_lapNow[n]);
+    }
     var jumpBox=document.getElementById('bookChapterJump');
     if(jumpBox){ jumpBox.innerHTML=notesBookChapterJumpHTML(n); wireChapterJumpBox(jumpBox,n); }
   }
@@ -854,11 +863,13 @@ function notesUnitList(){
   var h='<h2 style="margin-bottom:6px">📘 Chapter Notes <span style="font-weight:400;color:var(--muted);font-size:14px">— '+PARTS[PART].name+'</span></h2><p style="color:var(--muted);font-size:14px;margin-bottom:14px">Your complete study guide, chapter by chapter — forms, thresholds, rules and worked examples.</p>';
   h+=bookDownloadHtml();
   h+=taxToolDownloadHtml();
-  var reviewedSet=summaryReviewedAll()[PART]||{};
+  // Current revision lap, not the all-time "ever opened" set — resets each
+  // time a full pass through the Part completes (see notesBookIndex above).
+  var lapSet=(summaryCyclesAll()[PART]||{}).current||{};
   Object.keys(C).sort(function(a,b){return a-b;}).forEach(function(n){
     var u=C[n];
     var nq=(BOOKQ[PART]&&BOOKQ[PART][n])?BOOKQ[PART][n].length:0;
-    h+='<button class="opt'+(isWeakChapter(n)?' weak':'')+(reviewedSet[n]?' reviewed':'')+'" data-nu="'+n+'"><b>'+(isWeakChapter(n)?'🚩 ':'')+'SU '+n+': '+esc(u.t)+'</b><br><span style="color:var(--muted);font-size:13px">'+u.s.length+' sections · '+u.f.length+' forms · '+u.k.length+' key numbers'+(nq?' · '+nq+' study questions':'')+'</span></button>';
+    h+='<button class="opt'+(isWeakChapter(n)?' weak':'')+(lapSet[n]?' reviewed':'')+'" data-nu="'+n+'"><b>'+(isWeakChapter(n)?'🚩 ':'')+'SU '+n+': '+esc(u.t)+'</b><br><span style="color:var(--muted);font-size:13px">'+u.s.length+' sections · '+u.f.length+' forms · '+u.k.length+' key numbers'+(nq?' · '+nq+' study questions':'')+'</span></button>';
   });
   h+='<div class="nav2"><button class="navbtn" id="nulBack">← Exam Menu</button><span></span></div>';
   card.innerHTML=h;
