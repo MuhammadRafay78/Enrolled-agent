@@ -455,12 +455,14 @@ function _mergeSyncedValue(key,aStr,bStr){
     try{b2=JSON.parse(bStr)||{};}catch(e){}
     return JSON.stringify(_mergeNestedSet(a2,b2));
   }
-  // {part: {count,current:{unit:1,...}}} — count can only go up (max), and
-  // the in-progress lap's touched-chapter set is unioned like the reviewed
-  // set above. If that union happens to already cover every chapter, the
-  // app's own read path (summaryCycleCount) rolls it over into a completed
-  // lap the next time it's checked — this merge doesn't need to know how
-  // many chapters a Part has to stay safe.
+  // {part: {count,current:{unit:1,...}}} — count can only go up (max). The
+  // in-progress lap's touched-chapter set is unioned ONLY when both sides
+  // are genuinely mid-way through the SAME lap (equal count) — safe to
+  // combine partial progress from two devices there. When counts differ,
+  // the higher-count side just completed (and reset) a lap the other side's
+  // "current" still predates — unioning that stale, nearly-full set back in
+  // would resurrect it into what should be a fresh lap, undoing the reset.
+  // Take the higher-count side's current as-is instead.
   if(key==='ea3quiz_v2_summary_cycles'){
     var a3={},b3={};
     try{a3=JSON.parse(aStr)||{};}catch(e){}
@@ -471,7 +473,11 @@ function _mergeSyncedValue(key,aStr,bStr){
     var outCycles={};
     Object.keys(parts).forEach(function(pk){
       var pa=a3[pk]||{count:0,current:{}}, pb=b3[pk]||{count:0,current:{}};
-      outCycles[pk]={count:Math.max(pa.count||0,pb.count||0),current:Object.assign({},pa.current,pb.current)};
+      var ca=pa.count||0, cb=pb.count||0;
+      var mergedCurrent;
+      if(ca===cb) mergedCurrent=Object.assign({},pa.current,pb.current);
+      else mergedCurrent=Object.assign({},(ca>cb?pa.current:pb.current));
+      outCycles[pk]={count:Math.max(ca,cb),current:mergedCurrent};
     });
     return JSON.stringify(outCycles);
   }

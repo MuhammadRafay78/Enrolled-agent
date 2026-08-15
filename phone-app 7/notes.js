@@ -726,8 +726,14 @@ function showNotesBook(startUnit){
     side.querySelectorAll('[data-jumpchapter]').forEach(function(b){b.classList.toggle('on',b.dataset.jumpchapter===n);});
     // Reflect the review that recordSummaryReviewed() just logged: mark this
     // chapter's TOC entry reviewed immediately, without re-rendering the list.
+    // Checked against the actual current-lap set (not unconditional) — if this
+    // touch was the one that completed and reset the lap, nothing should be
+    // marked green anymore, this chapter included.
     var jumpBtn=side.querySelector('[data-jumpchapter="'+n+'"]');
-    if(jumpBtn)jumpBtn.classList.add('reviewed');
+    if(jumpBtn){
+      var _lapNow=(summaryCyclesAll()[PART]||{}).current||{};
+      jumpBtn.classList.toggle('reviewed',!!_lapNow[n]);
+    }
     var jumpBox=document.getElementById('bookChapterJump');
     if(jumpBox){ jumpBox.innerHTML=notesBookChapterJumpHTML(n); wireChapterJumpBox(jumpBox,n); }
   }
