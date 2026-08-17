@@ -309,7 +309,10 @@
         (q && q.topic ? 'TOPIC: ' + q.topic + '\n' : '') +
         'STUDENT NOTE: ' + note + '\n\nCANDIDATE SECTIONS:\n' + listText;
       const res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt })
+        // Non-streaming: the whole reply is just one number or "NONE", and
+        // nothing here renders it incrementally — no reason to risk a
+        // mid-stream cutoff for a response this short.
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, stream: false })
       });
       if (!res.ok || !res.body) return undefined;
       const reader = res.body.getReader(), decoder = new TextDecoder();
@@ -1334,7 +1337,7 @@
     // Try the request, retrying on an empty OR truncated-looking response.
     // Streaming render is debounced via requestAnimationFrame — one paint per frame
     // instead of one per network chunk. Big speed win on long answers.
-    async function attemptRequest() {
+    async function attemptRequest(useStream) {
       // NOTE: Authorization header is intentionally NOT sent until the worker's CORS
       // Access-Control-Allow-Headers is updated to include "Authorization". Sending it
       // triggers a preflight the current worker rejects, and the whole fetch fails.
@@ -1348,7 +1351,7 @@
       const res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
         method: 'POST',
         headers: _headers,
-        body: JSON.stringify({ prompt: fullPrompt })
+        body: JSON.stringify({ prompt: fullPrompt, stream: useStream })
       });
       if (!res.ok || !res.body) return '';
 
@@ -1373,7 +1376,12 @@
       const MAX_ATTEMPTS = 3;
       let fullText = '';
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        fullText = await attemptRequest();
+        // First try streams (the nice word-by-word "typing" effect). A
+        // streamed response can get cut off mid-sentence if the connection to
+        // Gemini hiccups partway through a long answer — retries switch to a
+        // plain (non-streaming) request instead, which either comes back
+        // fully complete or fails outright, so it can't be cut off partway.
+        fullText = await attemptRequest(attempt === 1);
         if (fullText && !_looksTruncated(fullText)) break;
         if (attempt < MAX_ATTEMPTS) {
           typing.innerHTML = '<div class="ai-typing"><span></span><span></span><span></span></div>';
