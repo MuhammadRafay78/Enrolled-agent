@@ -1323,7 +1323,25 @@
           'options above are background only. Answer ONLY the exact request in STUDENT QUESTION below.\n\n') +
       'STUDENT QUESTION (this turn): ' + q;
 
-    // Try the request, with one automatic retry on empty response.
+    // The worker occasionally drops the stream partway through — the response
+    // isn't empty, it just stops mid-sentence (e.g. "...the **Internal Revenue
+    // Manual (IRM § 5.15.1"). That's worse than an empty response: it looks like
+    // a real, finished answer, so nothing downstream retries it. Catch the two
+    // clearest fingerprints of a cut-off stream: an odd number of "**" (a bold
+    // span that never closed) and text that doesn't end on real closing
+    // punctuation. Neither is foolproof alone, but a cut-off stream almost always
+    // trips at least one of them, while a genuinely finished answer trips neither.
+    function _looksTruncated(text) {
+      const t = (text || '').trim();
+      if (t.length < 20) return true;
+      const boldMarkers = (t.match(/\*\*/g) || []).length;
+      if (boldMarkers % 2 !== 0) return true;
+      const last = t.slice(-1);
+      if (!/[.!?"'\)\]:*`]/.test(last)) return true;
+      return false;
+    }
+
+    // Try the request, retrying on an empty OR truncated-looking response.
     // Streaming render is debounced via requestAnimationFrame — one paint per frame
     // instead of one per network chunk. Big speed win on long answers.
     async function attemptRequest() {
@@ -1362,13 +1380,20 @@
     }
 
     try {
-      let fullText = await attemptRequest();
-      if (!fullText) {
-        typing.innerHTML = '<div class="ai-typing"><span></span><span></span><span></span></div>';
-        await new Promise(r => setTimeout(r, 500));
+      const MAX_ATTEMPTS = 3;
+      let fullText = '';
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         fullText = await attemptRequest();
+        if (fullText && !_looksTruncated(fullText)) break;
+        if (attempt < MAX_ATTEMPTS) {
+          typing.innerHTML = '<div class="ai-typing"><span></span><span></span><span></span></div>';
+          await new Promise(r => setTimeout(r, 500));
+        }
       }
-      if (!fullText) {
+      // A cut-off stream is worse than no answer at all — showing half a sentence
+      // is what confused students into replying "???" — so a truncated result
+      // never reaches the chat even after retries are exhausted.
+      if (!fullText || _looksTruncated(fullText)) {
         typing.textContent = 'The AI is busy — please try again in a moment.';
       }
     } catch (e) {
