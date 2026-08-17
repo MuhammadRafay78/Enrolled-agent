@@ -1152,11 +1152,11 @@
       return;
     }
 
-    // Demo users: count this against their small AI quota BEFORE we send
+    // Demo users: count this against their small AI quota — but only once we
+    // know a real answer came back (see the success branch below). Demo users
+    // get just 5 questions total; charging one for a backend hiccup they can't
+    // control and got nothing for is a bad first impression of a paid feature.
     var _isDemoCaller = (typeof isDemoActive === 'function' && isDemoActive() && (typeof isAdminUser !== 'function' || !isAdminUser()));
-    if (_isDemoCaller) {
-      try { bumpDemoAi(); } catch(e) {}
-    }
 
     addMsg(q, true);
     // Persist immediately so the user's question survives a mid-response close/refresh
@@ -1193,16 +1193,6 @@
     }
 
     const typing = addTyping();
-
-    // Increment usage counter (for non-admin users)
-    if (!isAdmin) {
-      try {
-        var u = readUsage();
-        var k = todayEst();
-        u[k] = (u[k] || 0) + 1;
-        localStorage.setItem(AI_USAGE_KEY, JSON.stringify(u));
-      } catch(e) {}
-    }
 
     // Scroll so the user's question is visible at the top of the messages area
     const userMsg = messages.lastElementChild.previousElementSibling; // the just-added user msg
@@ -1395,6 +1385,23 @@
       // never reaches the chat even after retries are exhausted.
       if (!fullText || _looksTruncated(fullText)) {
         typing.textContent = 'The AI is busy — please try again in a moment.';
+      } else {
+        // Only spend quota once a real, complete answer actually came back —
+        // a student whose 3 retries all failed (backend hiccup, not their
+        // fault) shouldn't lose one of their questions for nothing. Demo users
+        // especially: they get just 5 questions total, so charging one for a
+        // failure would be a bad first impression of a paid feature.
+        if (!isAdmin) {
+          try {
+            var u = readUsage();
+            var k = todayEst();
+            u[k] = (u[k] || 0) + 1;
+            localStorage.setItem(AI_USAGE_KEY, JSON.stringify(u));
+          } catch(e) {}
+        }
+        if (_isDemoCaller) {
+          try { bumpDemoAi(); } catch(e) {}
+        }
       }
     } catch (e) {
       typing.textContent = 'Error: could not reach the AI. Please try again.';
