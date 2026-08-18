@@ -159,7 +159,20 @@ function showMenu(){
   const nExtra=(XTRA||[]).reduce(function(t,g){return t+g.questions.length;},0);
   const nGleim=(GLEIM_CH||[]).reduce(function(t,g){return t+g.questions.length;},0);
   var nBookq=0; if(BOOKQ[PART])Object.keys(BOOKQ[PART]).forEach(function(k){nBookq+=BOOKQ[PART][k].length;});
-  const totalQ=nMock+nMcq+nExtra+nGleim+nBookq;
+  // Some mock-exam questions are verbatim copies of a chapter-bank question
+  // (mainly Mock Exam 1 reusing chapter practice questions) — nMock/nMcq/etc.
+  // above stay as true per-resource sizes (used in their own section headers,
+  // e.g. "4 exams · 400 questions"), but the part-wide total shown at the
+  // top of the dashboard, and everywhere it feeds "Answered"/search, should
+  // count each real question once even if it appears in more than one pool.
+  function _qKey(q){ return String((q&&q.q)||'').toLowerCase().replace(/\s+/g,' ').trim(); }
+  var _uniqQ={};
+  EXAMS.forEach(function(e){e.questions.forEach(function(q){_uniqQ[_qKey(q)]=1;});});
+  MCQS.forEach(function(c){c.questions.forEach(function(q){_uniqQ[_qKey(q)]=1;});});
+  (XTRA||[]).forEach(function(g){g.questions.forEach(function(q){_uniqQ[_qKey(q)]=1;});});
+  (GLEIM_CH||[]).forEach(function(g){g.questions.forEach(function(q){_uniqQ[_qKey(q)]=1;});});
+  if(BOOKQ[PART])Object.keys(BOOKQ[PART]).forEach(function(k){BOOKQ[PART][k].forEach(function(q){_uniqQ[_qKey(q)]=1;});});
+  const totalQ=Object.keys(_uniqQ).length;
   document.getElementById('counter').textContent=meta.name+(totalQ?' Practice':' — Study Notes');
   document.getElementById('score').textContent=totalQ?'Choose an exam':'Choose a section';
   document.getElementById('prog').style.width='0%';
@@ -168,10 +181,18 @@ function showMenu(){
 
   // ---- rolled-up progress for the whole part ----
   var ansAll=0,rightAll=0,unitAgg={};
+  // Shared across every fold() call below (and the BOOKQ block further down)
+  // so a question answered in more than one pool — e.g. a chapter-bank
+  // question that's also in a mock exam — only counts once toward these
+  // dashboard totals, same reasoning as totalQ above. Whichever pool gets
+  // folded in first "wins" the tie for right/wrong; pools are folded in a
+  // fixed order (exams, then chapter bank, extra, Gleim, book questions).
+  var _countedQ={};
   function fold(qs,answers){
     if(!answers)return;
     answers.forEach(function(v,j){
       if(v===null||v===undefined||!qs[j])return;
+      var key=_qKey(qs[j]); if(_countedQ[key])return; _countedQ[key]=1;
       ansAll++; var ok=(v===qs[j].a); if(ok)rightAll++;
       var u=qs[j].unit||'—';
       unitAgg[u]=unitAgg[u]||{a:0,r:0}; unitAgg[u].a++; if(ok)unitAgg[u].r++;
@@ -185,7 +206,7 @@ function showMenu(){
   MCQS.forEach(function(mc,i){var s=mcqState(i);if(s)fold(mc.questions,s.answers);});
   (XTRA||[]).forEach(function(g,i){var sx=xState(i);if(sx)fold(g.questions,sx.answers);});
   (GLEIM_CH||[]).forEach(function(g,i){var sg=gState(i);if(sg)fold(g.questions,sg.answers);});
-  if(BOOKQ[PART]){var bs=bqState();Object.keys(BOOKQ[PART]).forEach(function(n){var qs=BOOKQ[PART][n];qs.forEach(function(q,i){var v=bs[n+':'+i];if(v!==undefined&&v!==null){ansAll++;var ok=(v===q.a);if(ok)rightAll++;var u=q.unit||'—';unitAgg[u]=unitAgg[u]||{a:0,r:0};unitAgg[u].a++;if(ok)unitAgg[u].r++;}});});}
+  if(BOOKQ[PART]){var bs=bqState();Object.keys(BOOKQ[PART]).forEach(function(n){var qs=BOOKQ[PART][n];qs.forEach(function(q,i){var v=bs[n+':'+i];if(v!==undefined&&v!==null){var key=_qKey(q);if(_countedQ[key])return;_countedQ[key]=1;ansAll++;var ok=(v===q.a);if(ok)rightAll++;var u=q.unit||'—';unitAgg[u]=unitAgg[u]||{a:0,r:0};unitAgg[u].a++;if(ok)unitAgg[u].r++;}});});}
   var pct=ansAll?Math.round(rightAll/ansAll*100):0;
   var weakest=null;
   Object.keys(unitAgg).forEach(function(u){
