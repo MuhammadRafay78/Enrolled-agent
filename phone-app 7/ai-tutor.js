@@ -1204,6 +1204,17 @@
     // Grab the currently visible question, options, AND the correct answer + book's own explanation
     // from the underlying JS data (not just the DOM), so the tutor teaches FROM the truth
     // instead of guessing at it.
+    // "Explain the concept" (and similar plain-concept requests) must teach the
+    // underlying rule WITHOUT ever revealing or hinting at which option answers
+    // the specific question on screen — that's the whole point of using this
+    // button instead of "Explain this question". The soft instruction alone
+    // (below, in STYLE) wasn't enough — the model kept leaking the answer
+    // because it was sitting right there in context as CORRECT ANSWER /
+    // STUDENT'S CHOSEN ANSWER / the book's answer-specific explanation. Detect
+    // this intent and omit those three lines from context entirely, so there's
+    // nothing answer-specific left for the model to leak even by accident.
+    const wantsConceptOnly = /\bexplain (the )?(core )?(tax )?concept\b/i.test(q);
+
     let context = '';
     try {
       let currentQ = null;
@@ -1218,12 +1229,13 @@
         (currentQ.opts || []).forEach((o, i) => {
           context += String.fromCharCode(65 + i) + '. ' + String(o).trim() + '\n';
         });
-        if (typeof currentQ.a === 'number' && currentQ.opts && currentQ.opts[currentQ.a]) {
+        if (!wantsConceptOnly && typeof currentQ.a === 'number' && currentQ.opts && currentQ.opts[currentQ.a]) {
           context += '\nCORRECT ANSWER: ' + String.fromCharCode(65 + currentQ.a) +
                      '. ' + String(currentQ.opts[currentQ.a]).trim() + '\n';
         }
-        // Student's own chosen answer — lets the tutor explain why THEIR pick was wrong
-        try {
+        // Student's own chosen answer — lets the tutor explain why THEIR pick was wrong.
+        // Skipped for concept-only requests, same reasoning as CORRECT ANSWER above.
+        if (!wantsConceptOnly) try {
           const qIdx = st.order[pos];
           const chosen = st.answers[qIdx];
           if (chosen !== null && chosen !== undefined && currentQ.opts && currentQ.opts[chosen]) {
@@ -1236,7 +1248,10 @@
             context += '\nSTUDENT\'S CHOSEN ANSWER: (not yet answered)\n';
           }
         } catch(e) {}
-        if (currentQ.expl && String(currentQ.expl).trim()) {
+        // The book's own explanation is answer-specific by nature (it exists to
+        // justify the correct choice) — including it here would leak the answer
+        // just as surely as the line above, so skip it for concept-only too.
+        if (!wantsConceptOnly && currentQ.expl && String(currentQ.expl).trim()) {
           context += '\nBOOK\'S OWN EXPLANATION (use this as the ground truth; expand and clarify, do not contradict):\n' +
                      String(currentQ.expl).trim() + '\n';
         }
@@ -1311,6 +1326,12 @@
       (wantsBreakdown
         ? 'THIS TURN: the student is asking about the answer choices. Walk through why the correct answer is right ' +
           'and, in a compact list, why each wrong option is wrong ("Why A is wrong: …").\n\n'
+        : wantsConceptOnly
+        ? 'THIS TURN — CRITICAL: the student wants the underlying concept/rule taught in general terms, completely ' +
+          'independent of this specific question. Do not say or imply which option (A, B, C, or D) is correct, do ' +
+          'not say whether the student\'s own pick was right or wrong, and do not write anything resembling "why X ' +
+          'is wrong". Teach the rule itself — the reader should come away understanding the concept well enough to ' +
+          'answer questions like this one, without ever being told this one\'s answer.\n\n'
         : 'THIS TURN — CRITICAL: the student is NOT asking about the answer choices. Do not mention option A, B, C, ' +
           'or D, and do not write anything resembling "why X is wrong" or a breakdown of the choices. The answer ' +
           'options above are background only. Answer ONLY the exact request in STUDENT QUESTION below.\n\n') +
@@ -1319,11 +1340,15 @@
     // The worker occasionally drops the stream partway through — the response
     // isn't empty, it just stops mid-sentence (e.g. "...the **Internal Revenue
     // Manual (IRM § 5.15.1"). That's worse than an empty response: it looks like
-    // a real, finished answer, so nothing downstream retries it. Catch the two
+    // a real, finished answer, so nothing downstream retries it. Catch the
     // clearest fingerprints of a cut-off stream: an odd number of "**" (a bold
-    // span that never closed) and text that doesn't end on real closing
-    // punctuation. Neither is foolproof alone, but a cut-off stream almost always
-    // trips at least one of them, while a genuinely finished answer trips neither.
+    // span that never closed), text that doesn't end on real closing
+    // punctuation, and — the sneaky one — a cutoff that happens to land right
+    // after something paren-shaped, e.g. "...Schedule K-1 (Form 1041)". That
+    // reads like a clean sentence ending but can still be a truncated list with
+    // no "Key takeaway" line, which STYLE above requires on every real answer.
+    // None of these are foolproof alone, but a cut-off stream almost always
+    // trips at least one, while a genuinely finished answer trips none.
     function _looksTruncated(text) {
       const t = (text || '').trim();
       if (t.length < 20) return true;
@@ -1331,6 +1356,7 @@
       if (boldMarkers % 2 !== 0) return true;
       const last = t.slice(-1);
       if (!/[.!?"'\)\]:*`]/.test(last)) return true;
+      if (t.length > 150 && !/key takeaway/i.test(t)) return true;
       return false;
     }
 
@@ -1373,7 +1399,7 @@
     }
 
     try {
-      const MAX_ATTEMPTS = 3;
+      const MAX_ATTEMPTS = 5;
       let fullText = '';
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         // First try streams (the nice word-by-word "typing" effect). A
