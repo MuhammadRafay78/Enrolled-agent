@@ -885,7 +885,8 @@ function notesUnitList(){
 // interactive notes library. Keyed by Part — only parts with a book shipped show the link.
 var BOOK_PDFS={
   1:{file:'books/EA-Part1-Individuals-Study-Guide.pdf', label:'EA Part 1 — Individuals Study Guide'},
-  2:{file:'books/EA-Part2-Businesses-Study-Guide.pdf', label:'EA Part 2 — Businesses Study Guide'}
+  2:{file:'books/EA-Part2-Businesses-Study-Guide.pdf', label:'EA Part 2 — Businesses Study Guide'},
+  3:{file:'books/EA-Part3-Representation-Study-Guide.pdf', label:'EA Part 3 — Representation, Practices, and Procedures Study Guide'}
 };
 function bookDownloadHtml(){
   var b=BOOK_PDFS[PART]; if(!b)return '';
