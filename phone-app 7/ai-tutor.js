@@ -868,6 +868,51 @@
       return out + '\n';
     }catch(e){ return ''; }
   }
+  // "Summarize this chapter" (and anything else asked while reading notes,
+  // not answering a quiz question) has no QUESTIONS/st/pos to read a chapter
+  // from — _currentQuestion() and the block above are quiz-only. notes.js
+  // shows the chapter you're actually reading as plain text in the header
+  // instead ("SU 12: Chapter title — Chapter Notes"), for both the
+  // single-chapter view and the continuous "book" scroll view alike (see
+  // notes.js's repeated '#counter' updates) — scrape that so the tutor
+  // knows which chapter to summarize instead of guessing or asking back.
+  function _notesViewChapterNum(){
+    try{
+      const t = (document.getElementById('counter') || {}).textContent || '';
+      const m = t.match(/^SU\s+(\d+):/);
+      return m ? m[1] : null;
+    }catch(e){ return null; }
+  }
+  // Full plain-text pass through every section of a chapter — the same
+  // material the in-app "Chapter Summary" screen shows (reuses notes.js's
+  // own per-section gist logic), so a whole-chapter summary request has
+  // real content to work with instead of just a title and a topic list.
+  function _notesViewChapterContext(chNum){
+    try{
+      if (typeof CHNOTES === 'undefined' || !CHNOTES || typeof PART === 'undefined') return '';
+      const notes = CHNOTES[PART];
+      const ch = notes && notes[chNum];
+      if (!ch) return '';
+      let out = 'STUDENT IS CURRENTLY READING: Chapter ' + chNum + ' — ' + (ch.t || '') + ' (' +
+                ((typeof PARTS !== 'undefined' && PARTS[PART] && PARTS[PART].name) || 'Part ' + PART) + ')\n\n';
+      if (Array.isArray(ch.f) && ch.f.length) {
+        out += 'Key forms: ' + ch.f.slice(0, 10).map(x => x.f + (x.ttl ? ' (' + x.ttl + ')' : '')).join('; ') + '\n\n';
+      }
+      out += 'FULL CHAPTER CONTENT (every section, in order):\n';
+      (ch.s || []).forEach(s => {
+        const gist = s.sum || (typeof _sectionGist === 'function' ? _sectionGist(s) : '');
+        out += '- ' + (s.t || '') + (gist ? ': ' + gist : '') + '\n';
+      });
+      if (Array.isArray(ch.k) && ch.k.length) {
+        const facts = ch.k.map(x => (x.t || '').trim()).filter(Boolean);
+        if (facts.length) out += '\nKey numbers: ' + facts.join(' | ') + '\n';
+      }
+      // Generous cap — this is the PRIMARY material for the whole answer here,
+      // not a supplementary hint alongside a question, so it needs real room.
+      if (out.length > 6000) out = out.slice(0, 6000) + '…\n';
+      return out + '\n';
+    }catch(e){ return ''; }
+  }
 
   // Self-heal: if the current user is an admin, clear any stale rate-limit counter
   try {
@@ -1272,6 +1317,13 @@
             if (o.offsetParent !== null) context += String.fromCharCode(65 + i) + '. ' + o.innerText.trim() + '\n';
           });
           context += '\n';
+        } else {
+          // Not in a quiz at all — reading a chapter's notes instead? This is
+          // what makes "Summarize this chapter" (asked from the Notes/Book
+          // view) actually work, instead of the tutor having no idea which
+          // chapter is on screen.
+          const chNum = _notesViewChapterNum();
+          if (chNum) context = _notesViewChapterContext(chNum);
         }
       }
     } catch(e) {}
