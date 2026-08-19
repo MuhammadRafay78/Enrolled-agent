@@ -312,7 +312,8 @@
         // Non-streaming: the whole reply is just one number or "NONE", and
         // nothing here renders it incrementally — no reason to risk a
         // mid-stream cutoff for a response this short.
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, stream: false })
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prompt, stream: false }),
+        signal: AbortSignal.timeout(25000)
       });
       if (!res.ok || !res.body) return undefined;
       const reader = res.body.getReader(), decoder = new TextDecoder();
@@ -1426,11 +1427,21 @@
       //   const _a = (typeof auth === 'function') ? auth() : null;
       //   if (_a && _a.access_token) _headers['Authorization'] = 'Bearer ' + _a.access_token;
       // } catch(e) {}
-      const res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
-        method: 'POST',
-        headers: _headers,
-        body: JSON.stringify({ prompt: fullPrompt, stream: useStream })
-      });
+      // Defense-in-depth: the worker itself now caps a single Gemini call at
+      // 20s and no longer retries internally (that used to compound with
+      // this loop's own retries — 5 attempts x 3 worker-side retries could
+      // mean 15 real calls and minutes of wait). 25s here is just a backstop
+      // in case the worker itself hangs; it should almost never fire since
+      // the worker's own 20s timeout normally returns a clean error first.
+      let res;
+      try {
+        res = await fetch('https://ea-ai.tr78601234.workers.dev/', {
+          method: 'POST',
+          headers: _headers,
+          body: JSON.stringify({ prompt: fullPrompt, stream: useStream }),
+          signal: AbortSignal.timeout(25000)
+        });
+      } catch (e) { return ''; }
       if (!res.ok || !res.body) return '';
 
       const reader = res.body.getReader();
