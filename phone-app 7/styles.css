@@ -514,7 +514,20 @@
     .card{padding:16px;border-radius:12px;}
     .qtext{font-size:16px;}
     .opt{padding:14px 13px;font-size:15px;margin-bottom:9px;}
-    .nav2{gap:10px;position:sticky;bottom:8px;}
+    /* .nav2 (Previous/Next, and any other "<div class=nav2>" button row like
+       menu.js's "Choose Part" back button) used to also set
+       position:sticky;bottom:8px here, meant to keep it visible without
+       scrolling. But sticky computes its stuck position from the viewport
+       alone — once a page's content is only a little taller than the
+       viewport (a short question with few options, or a short section of
+       the menu), that stuck position lands ON TOP OF the real content still
+       above it (confirmed: the refresher panel's own rendered box, and the
+       "Chapter questions"/"Chapter notes" cards on the part dashboard, both
+       got text-over-text overlapped by it). Reverting to normal static flow
+       (matching desktop, which never set sticky here) trades the
+       always-visible convenience for correctness — Previous/Next sit right
+       after the content instead of floating over it. */
+    .nav2{gap:10px;}
     .navbtn{flex:1;padding:14px 10px;font-size:15px;box-shadow:0 2px 8px rgba(0,0,0,.12);}
     body.inquiz #gridToggle{display:block;}
     .side.active{display:none;}
@@ -522,6 +535,16 @@
     .side-hd{top:-16px;}
     .totop{right:14px;bottom:78px;width:40px;height:40px;}
     .floatback{left:12px;bottom:78px;padding:9px 15px;font-size:13px;}
+    /* Was bottom:16px (the shared base rule), which put it directly on top of
+       #ai-tutor-btn (the AI Tutor launcher — ai-tutor.css sets that one to
+       bottom:80px/48px tall while in-quiz): confirmed their rects are nearly
+       identical, and since the AI Tutor button's z-index (9999) sits above
+       this one (60), the AI Tutor button was rendering fully on top of and
+       hiding the side-panel toggle underneath it — an admin or demo user
+       could not tap it at all on mobile, not just a visual overlap. Stacked
+       above the AI Tutor button's footprint (80 to 80+48=128px) instead of
+       sharing it. */
+    #gridToggle{bottom:136px;}
     .swbtn{padding:5px 8px;font-size:12px;}
     .swpanel{width:230px;}
     .top{font-size:13px;gap:6px;}
