@@ -1406,6 +1406,13 @@
     // Concept explanations, chapter summaries, mnemonics, practice questions, and
     // general questions must NOT get it, even though the options are in context below.
     const wantsBreakdown = /\b(explain this question|why (is|was)( my)? (the )?answer|why.*\bwrong\b|break ?down|wrong answer|trap answer)\b/i.test(q);
+    // These two request types don't naturally end on a one-line rule recap: a
+    // generated practice question ends on its answer choices, and a chapter
+    // summary covers many rules, not one. Forcing "Key takeaway" onto them
+    // produces an awkward bolt-on line at best — so skip asking for it, and
+    // (below) skip requiring it when judging whether a reply got cut off.
+    const skipKeyTakeaway = /\b(practice questions?|similar questions?)\b/i.test(q) ||
+      /\bsummarize\b.{0,20}\bchapter\b/i.test(q);
 
     const fullPrompt =
       'ROLE: You are an expert EA-exam tutor. Teach clearly, cite authority (IRC section, Circular 230 § number, ' +
@@ -1421,7 +1428,8 @@
       'STYLE: Use clean markdown — **bold** for key terms, ### for short section headings, - for bullet lists, ' +
       '1. 2. 3. for numbered lists. Put EVERY list item on its own line (a real line break before each - or ' +
       'N.) — never run multiple items together on one line separated by " - " or numbers. ' +
-      'End with a one-line "**Key takeaway:**" that captures the rule the student should memorize.\n\n' +
+      (skipKeyTakeaway ? '' :
+      'End with a one-line "**Key takeaway:**" that captures the rule the student should memorize.\n\n') +
       'DO NOT emit LaTeX ($\\rightarrow$, $\\leq$, $\\alpha$, etc.). Write real characters: →, ≤, α. ' +
       'DO NOT restate the question back to the student verbatim — go straight into the explanation.\n\n' +
       _learningProfileContext(_cq, q) +
@@ -1450,7 +1458,13 @@
     // punctuation, and — the sneaky one — a cutoff that happens to land right
     // after something paren-shaped, e.g. "...Schedule K-1 (Form 1041)". That
     // reads like a clean sentence ending but can still be a truncated list with
-    // no "Key takeaway" line, which STYLE above requires on every real answer.
+    // no "Key takeaway" line, which STYLE above requires on every real answer
+    // EXCEPT the two request types where skipKeyTakeaway is true (a generated
+    // practice question ends on its answer choices, not a rule recap; a
+    // chapter summary covers many rules, not one) — for those the prompt
+    // itself never asked for a "Key takeaway" line, so requiring one here
+    // would flag every complete, correct reply as truncated and burn all 5
+    // retries on a false alarm every single time.
     // None of these are foolproof alone, but a cut-off stream almost always
     // trips at least one, while a genuinely finished answer trips none.
     function _looksTruncated(text) {
@@ -1460,7 +1474,7 @@
       if (boldMarkers % 2 !== 0) return true;
       const last = t.slice(-1);
       if (!/[.!?"'\)\]:*`]/.test(last)) return true;
-      if (t.length > 150 && !/key takeaway/i.test(t)) return true;
+      if (!skipKeyTakeaway && t.length > 150 && !/key takeaway/i.test(t)) return true;
       return false;
     }
 
