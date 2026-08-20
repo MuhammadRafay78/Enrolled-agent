@@ -10,7 +10,7 @@ function enterQuiz(){
 function headerScore(){
   if(st.mode==='exam'&&!st.examDone){tickTimer();return;}
   const c=counts();
-  document.getElementById('score').textContent='Score: '+c.right+'/'+c.ans;
+  document.getElementById('score').textContent='Score: '+c.right+'/'+c.ans+(c.ans?' ('+Math.round(c.right/c.ans*100)+'%)':'');
 }
 function examName(){return exam===-2?'Smart Review':(exam===-3?UNITS[CHAP].name:(exam===-4?MCQS[MCH].name:(exam===-5?XTRA[XCH].name:(exam===-6?'Flagged Questions':(exam===-7?'Wrong Questions':(exam===-8?('Search: "'+(window._searchQuizTerm||'')+'"'):(exam===-9?'Wrong + Flagged (Shuffled)':(exam===-10?'Toughest for Me':(exam===-11?GLEIM_CH[GCH].name:EXAMS[exam].name)))))))));}
 function renderSide(){

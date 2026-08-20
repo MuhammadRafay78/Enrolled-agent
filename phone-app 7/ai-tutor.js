@@ -1034,14 +1034,24 @@
   function renderMarkdown(text) {
     // Translate LaTeX commands into Unicode first
     text = stripLatex(text);
-    // Split inline "* a * b * c" bullet runs onto their own lines
+    // Split inline "* a * b * c" / "- a. - b." / "1. a 2. b" bullet runs onto their own lines
     text = normalizeInlineLists(text);
     // Escape HTML
     let html = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    // Code blocks and inline code are pulled out into opaque placeholder
+    // tokens BEFORE any other markdown pass runs, and restored verbatim at
+    // the very end. Without this, code content containing "# comment",
+    // "**x**", or "- y" got reinterpreted as a heading/bold/list by the
+    // later regexes — for a multi-line fenced block this could even scatter
+    // its closing "</code></pre>" into the middle of an unrelated <li>.
+    // \u0000 can't appear in normal chat text, so it's safe as a delimiter.
+    const protectedBlocks = [];
+    const protect = h => { protectedBlocks.push(h); return '\u0000BLK' + (protectedBlocks.length - 1) + '\u0000'; };
     // Code blocks
-    html = html.replace(/```([\s\S]*?)```/g, (_,c) => '<pre><code>'+c.trim()+'</code></pre>');
+    html = html.replace(/```([\s\S]*?)```/g, (_,c) => protect('<pre><code>'+c.trim()+'</code></pre>'));
     // Inline code
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/`([^`]+)`/g, (_,c) => protect('<code>'+c+'</code>'));
     // Headings
     html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
     html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
@@ -1071,11 +1081,31 @@
       const items = m.trim().split('\n').map(l => '<li>'+l.replace(/^\d+\. /,'')+'</li>').join('');
       return '<ol>'+items+'</ol>\n';
     });
-    // Paragraphs (wrap remaining lines)
-    html = html.split(/\n\n+/).map(block => {
-      if (/^\s*<(h[1-3]|ul|ol|pre|blockquote|table|hr)/.test(block)) return block;
-      return '<p>'+block.replace(/\n/g,'<br>')+'</p>';
-    }).join('');
+    // Paragraphs. Wrap runs of plain lines in <p>, joining single line
+    // breaks within a run with <br> (same "\n\n = new paragraph, \n = line
+    // break" contract as before) — but per physical line rather than per
+    // \n\n-delimited block. Splitting only on blank lines meant a block
+    // that merely STARTED with a rendered tag (heading/list/table/hr/
+    // blockquote) was returned untouched in its entirety, so a closing
+    // sentence the AI glued onto "</ul>" with just one "\n" (no blank line)
+    // rode along unwrapped and un-<br>'d, rendering squashed against the
+    // list with no visible line break at all.
+    const isBlockLine = l => /^\s*<(h[1-3]|ul|ol|blockquote|table|hr)/.test(l) || /^\u0000BLK\d+\u0000$/.test(l.trim());
+    const pLines = html.split('\n');
+    const pOut = [];
+    let pBuf = [];
+    const pFlush = () => { if (pBuf.length) { pOut.push('<p>'+pBuf.join('<br>')+'</p>'); pBuf = []; } };
+    for (const line of pLines) {
+      if (line.trim() === '') { pFlush(); continue; }
+      if (isBlockLine(line)) { pFlush(); pOut.push(line); }
+      else pBuf.push(line);
+    }
+    pFlush();
+    html = pOut.join('');
+
+    // Restore the code blocks/inline code protected at the top of this
+    // function, now that no other pass can misinterpret their contents.
+    html = html.replace(/\u0000BLK(\d+)\u0000/g, (_, i) => protectedBlocks[+i]);
     return html;
   }
 
@@ -1376,6 +1406,13 @@
     // Concept explanations, chapter summaries, mnemonics, practice questions, and
     // general questions must NOT get it, even though the options are in context below.
     const wantsBreakdown = /\b(explain this question|why (is|was)( my)? (the )?answer|why.*\bwrong\b|break ?down|wrong answer|trap answer)\b/i.test(q);
+    // These two request types don't naturally end on a one-line rule recap: a
+    // generated practice question ends on its answer choices, and a chapter
+    // summary covers many rules, not one. Forcing "Key takeaway" onto them
+    // produces an awkward bolt-on line at best — so skip asking for it, and
+    // (below) skip requiring it when judging whether a reply got cut off.
+    const skipKeyTakeaway = /\b(practice questions?|similar questions?)\b/i.test(q) ||
+      /\bsummarize\b.{0,20}\bchapter\b/i.test(q);
 
     const fullPrompt =
       'ROLE: You are an expert EA-exam tutor. Teach clearly, cite authority (IRC section, Circular 230 § number, ' +
@@ -1391,7 +1428,8 @@
       'STYLE: Use clean markdown — **bold** for key terms, ### for short section headings, - for bullet lists, ' +
       '1. 2. 3. for numbered lists. Put EVERY list item on its own line (a real line break before each - or ' +
       'N.) — never run multiple items together on one line separated by " - " or numbers. ' +
-      'End with a one-line "**Key takeaway:**" that captures the rule the student should memorize.\n\n' +
+      (skipKeyTakeaway ? '' :
+      'End with a one-line "**Key takeaway:**" that captures the rule the student should memorize.\n\n') +
       'DO NOT emit LaTeX ($\\rightarrow$, $\\leq$, $\\alpha$, etc.). Write real characters: →, ≤, α. ' +
       'DO NOT restate the question back to the student verbatim — go straight into the explanation.\n\n' +
       _learningProfileContext(_cq, q) +
@@ -1420,7 +1458,13 @@
     // punctuation, and — the sneaky one — a cutoff that happens to land right
     // after something paren-shaped, e.g. "...Schedule K-1 (Form 1041)". That
     // reads like a clean sentence ending but can still be a truncated list with
-    // no "Key takeaway" line, which STYLE above requires on every real answer.
+    // no "Key takeaway" line, which STYLE above requires on every real answer
+    // EXCEPT the two request types where skipKeyTakeaway is true (a generated
+    // practice question ends on its answer choices, not a rule recap; a
+    // chapter summary covers many rules, not one) — for those the prompt
+    // itself never asked for a "Key takeaway" line, so requiring one here
+    // would flag every complete, correct reply as truncated and burn all 5
+    // retries on a false alarm every single time.
     // None of these are foolproof alone, but a cut-off stream almost always
     // trips at least one, while a genuinely finished answer trips none.
     function _looksTruncated(text) {
@@ -1430,7 +1474,7 @@
       if (boldMarkers % 2 !== 0) return true;
       const last = t.slice(-1);
       if (!/[.!?"'\)\]:*`]/.test(last)) return true;
-      if (t.length > 150 && !/key takeaway/i.test(t)) return true;
+      if (!skipKeyTakeaway && t.length > 150 && !/key takeaway/i.test(t)) return true;
       return false;
     }
 
