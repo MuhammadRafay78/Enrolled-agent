@@ -120,7 +120,8 @@ function render(){
       var isWrong = (st.answers[qIdx]!==null && st.answers[qIdx]!==Q.a && feedbackOn());
       var label = isWrong ? '💡 Why did I get this wrong?' : '✨ Ask AI';
       var cls = isWrong ? 'flagbtn askai-hot' : 'flagbtn';
-      return '<button class="'+cls+'" id="askAiBtn" data-hot="'+(isWrong?'1':'0')+'" title="Ask AI to explain this question (shortcut: ? or i)">'+label+'</button>';
+      return '<button class="'+cls+'" id="askAiBtn" data-hot="'+(isWrong?'1':'0')+'" title="Ask AI to explain this question (shortcut: ? or i)">'+label+'</button>'+
+        '<button class="flagbtn" id="conceptAiBtn" title="Ask AI to teach the underlying concept, independent of this specific question">💭 Explain concept</button>';
     })()+
     (st.answers[qIdx]!==null?'<button class="flagbtn" id="resetQBtn" title="Clear your answer for this question">↺ Reset</button>':'')+
     (canReveal()&&st.answers[qIdx]===null&&!st.revealAll?'<button class="flagbtn'+(isRevealed(qIdx)?' on':'')+'" id="seeAnsBtn">👁 '+(isRevealed(qIdx)?'Hide answer':'See answer')+'</button>':'')+'</div>'+
@@ -134,8 +135,9 @@ function render(){
   document.getElementById('flagBtn').onclick=function(){
     st.flags[qIdx]=!st.flags[qIdx];saveState();renderSide();render();
   };
-  var aab=document.getElementById('askAiBtn');
-  if(aab)aab.onclick=function(){
+  // Shared by the Ask AI and Explain Concept buttons — opens/restores the
+  // tutor panel exactly the same way, then prefills and sends the given prompt.
+  function _sendAiPrompt(promptText){
     var btn=document.getElementById('ai-tutor-btn');
     var panel=document.getElementById('ai-tutor-panel');
     var input=document.getElementById('ai-tutor-input');
@@ -150,12 +152,20 @@ function render(){
       panel.classList.remove('minimized');
       if(window.innerWidth >= 1024) document.body.classList.add('ai-open');
     }
+    input.value = promptText;
+    setTimeout(function(){sendBtn.click();},80);
+  }
+  var aab=document.getElementById('askAiBtn');
+  if(aab)aab.onclick=function(){
     // Prefill and send — targeted prompt if the student got this question wrong
     var isHot = aab.getAttribute('data-hot') === '1';
-    input.value = isHot
+    _sendAiPrompt(isHot
       ? 'I chose the wrong answer to this question. Explain why my choice is wrong and why the correct answer is right. Focus on the specific rule I got confused about, and give me a one-line way to remember it next time.'
-      : 'Explain this question in detail. Break down why the correct answer is right and why each wrong answer is wrong.';
-    setTimeout(function(){sendBtn.click();},80);
+      : 'Explain this question in detail. Break down why the correct answer is right and why each wrong answer is wrong.');
+  };
+  var cab=document.getElementById('conceptAiBtn');
+  if(cab)cab.onclick=function(){
+    _sendAiPrompt('Explain the core tax concept behind this question in plain language. What is the underlying rule I need to understand?');
   };
   var rqb=document.getElementById('resetQBtn');
   if(rqb)rqb.onclick=function(){
