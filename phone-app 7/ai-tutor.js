@@ -1034,14 +1034,24 @@
   function renderMarkdown(text) {
     // Translate LaTeX commands into Unicode first
     text = stripLatex(text);
-    // Split inline "* a * b * c" bullet runs onto their own lines
+    // Split inline "* a * b * c" / "- a. - b." / "1. a 2. b" bullet runs onto their own lines
     text = normalizeInlineLists(text);
     // Escape HTML
     let html = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+    // Code blocks and inline code are pulled out into opaque placeholder
+    // tokens BEFORE any other markdown pass runs, and restored verbatim at
+    // the very end. Without this, code content containing "# comment",
+    // "**x**", or "- y" got reinterpreted as a heading/bold/list by the
+    // later regexes — for a multi-line fenced block this could even scatter
+    // its closing "</code></pre>" into the middle of an unrelated <li>.
+    // \u0000 can't appear in normal chat text, so it's safe as a delimiter.
+    const protectedBlocks = [];
+    const protect = h => { protectedBlocks.push(h); return '\u0000BLK' + (protectedBlocks.length - 1) + '\u0000'; };
     // Code blocks
-    html = html.replace(/```([\s\S]*?)```/g, (_,c) => '<pre><code>'+c.trim()+'</code></pre>');
+    html = html.replace(/```([\s\S]*?)```/g, (_,c) => protect('<pre><code>'+c.trim()+'</code></pre>'));
     // Inline code
-    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+    html = html.replace(/`([^`]+)`/g, (_,c) => protect('<code>'+c+'</code>'));
     // Headings
     html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
     html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
@@ -1071,11 +1081,31 @@
       const items = m.trim().split('\n').map(l => '<li>'+l.replace(/^\d+\. /,'')+'</li>').join('');
       return '<ol>'+items+'</ol>\n';
     });
-    // Paragraphs (wrap remaining lines)
-    html = html.split(/\n\n+/).map(block => {
-      if (/^\s*<(h[1-3]|ul|ol|pre|blockquote|table|hr)/.test(block)) return block;
-      return '<p>'+block.replace(/\n/g,'<br>')+'</p>';
-    }).join('');
+    // Paragraphs. Wrap runs of plain lines in <p>, joining single line
+    // breaks within a run with <br> (same "\n\n = new paragraph, \n = line
+    // break" contract as before) — but per physical line rather than per
+    // \n\n-delimited block. Splitting only on blank lines meant a block
+    // that merely STARTED with a rendered tag (heading/list/table/hr/
+    // blockquote) was returned untouched in its entirety, so a closing
+    // sentence the AI glued onto "</ul>" with just one "\n" (no blank line)
+    // rode along unwrapped and un-<br>'d, rendering squashed against the
+    // list with no visible line break at all.
+    const isBlockLine = l => /^\s*<(h[1-3]|ul|ol|blockquote|table|hr)/.test(l) || /^\u0000BLK\d+\u0000$/.test(l.trim());
+    const pLines = html.split('\n');
+    const pOut = [];
+    let pBuf = [];
+    const pFlush = () => { if (pBuf.length) { pOut.push('<p>'+pBuf.join('<br>')+'</p>'); pBuf = []; } };
+    for (const line of pLines) {
+      if (line.trim() === '') { pFlush(); continue; }
+      if (isBlockLine(line)) { pFlush(); pOut.push(line); }
+      else pBuf.push(line);
+    }
+    pFlush();
+    html = pOut.join('');
+
+    // Restore the code blocks/inline code protected at the top of this
+    // function, now that no other pass can misinterpret their contents.
+    html = html.replace(/\u0000BLK(\d+)\u0000/g, (_, i) => protectedBlocks[+i]);
     return html;
   }
 
