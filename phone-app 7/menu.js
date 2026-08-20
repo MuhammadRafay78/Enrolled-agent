@@ -105,7 +105,9 @@ function partCounts(p){
   var d=PARTS[p];
   var n=d.exams.reduce(function(t,e){return t+e.questions.length;},0)+d.mcqs.reduce(function(t,c){return t+c.questions.length;},0);
   if(typeof EXTRA!=='undefined'&&EXTRA[p])n+=EXTRA[p].reduce(function(t,g){return t+g.questions.length;},0);
-  if(typeof BOOKQ!=='undefined'&&BOOKQ[p])Object.keys(BOOKQ[p]).forEach(function(k){n+=BOOKQ[p][k].length;});
+  // BOOKQ (chapter-notes Study Questions) intentionally excluded, same
+  // reasoning as the totalQ/Answered fix in showMenu() below — otherwise
+  // this landing-page count and the dashboard's would disagree.
   return n;
 }
 function showParts(){
