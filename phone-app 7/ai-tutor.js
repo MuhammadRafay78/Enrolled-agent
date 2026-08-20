@@ -962,20 +962,35 @@
   // Minimal markdown → HTML renderer (safe: escapes HTML first)
 
   // ---- Markdown renderer (used for bot messages) ----
-  // Split inline bullet-list runs like "* item1 * item2 * item3" into proper
-  // newline-separated markdown so the list parser can render them.
-  // Only fires when we see 3+ " * " tokens in a stretch — protects real emphasis.
+  // Split inline bullet/numbered-list runs the AI sometimes emits on one line
+  // instead of one item per line — "* a * b * c", "- a. - b. - c.", or
+  // "1. a 2. b 3. c" — into proper newline-separated markdown so the list
+  // parser below can render real <ul>/<ol> elements instead of one run-on
+  // paragraph. A marker only counts as a genuine list-item boundary when it
+  // sits at the very start of the line or right after a ". " sentence break,
+  // so mid-sentence asides ("the credit - which phases out - is worth...")
+  // and sentences that happen to end in a form/section number ("Form 8863. ")
+  // are left alone. Numbered markers are capped at 1-20 so real form/section
+  // numbers (which run into the hundreds or thousands) never get mistaken
+  // for list markers. Requires 2+ markers in a line before it touches anything.
   function normalizeInlineLists(text){
-    return text.replace(/(^|\n)([^\n]*?(?: \* [^\n]+){2,}[^\n]*)/g, (m, pre, run) => {
-      // Split on " * " but keep the leading text before the first " * " as-is
-      const idx = run.indexOf(' * ');
-      if (idx < 0) return m;
-      const head = run.slice(0, idx).trim();
-      const rest = run.slice(idx + 3);
-      const items = rest.split(/ \* /);
-      const bullets = items.map(x => '* ' + x.trim()).join('\n');
-      return pre + (head ? head + '\n' : '') + bullets;
-    });
+    const markerRe = /(^|\.\s+)(\*\s|-\s|(?:[1-9]|1\d|20)\.\s)/g;
+    return text.split('\n').map(line => {
+      const positions = [];
+      let m;
+      markerRe.lastIndex = 0;
+      while ((m = markerRe.exec(line))) {
+        positions.push(m.index + m[1].length);
+        if (markerRe.lastIndex === m.index) markerRe.lastIndex++; // avoid zero-width stalls
+      }
+      if (positions.length < 2) return line;
+      const lead = line.slice(0, positions[0]).trim();
+      const items = positions.map((start, i) => {
+        const end = i + 1 < positions.length ? positions[i + 1] : line.length;
+        return line.slice(start, end).trim();
+      });
+      return (lead ? lead + '\n' : '') + items.join('\n');
+    }).join('\n');
   }
 
   // Turns a run of "| a | b |" lines (with a "| :--- | :--- |" separator
@@ -1042,15 +1057,19 @@
     html = renderTables(html);
     // Blockquotes
     html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
-    // Unordered lists
+    // Unordered lists. The trailing "\n" is deliberately re-added after the
+    // closing tag: the match itself may have consumed the list's final
+    // newline (the "\n?" in the pattern), and without putting one back, the
+    // very next line gets glued onto "</ul>" and silently drops out of
+    // whatever list/heading regex was supposed to match it next.
     html = html.replace(/(?:^[*\-] .+\n?)+/gm, m => {
       const items = m.trim().split('\n').map(l => '<li>'+l.replace(/^[*\-] /,'')+'</li>').join('');
-      return '<ul>'+items+'</ul>';
+      return '<ul>'+items+'</ul>\n';
     });
-    // Ordered lists
+    // Ordered lists (same trailing-newline fix as unordered lists above)
     html = html.replace(/(?:^\d+\. .+\n?)+/gm, m => {
       const items = m.trim().split('\n').map(l => '<li>'+l.replace(/^\d+\. /,'')+'</li>').join('');
-      return '<ol>'+items+'</ol>';
+      return '<ol>'+items+'</ol>\n';
     });
     // Paragraphs (wrap remaining lines)
     html = html.split(/\n\n+/).map(block => {
@@ -1369,7 +1388,9 @@
       'One Big Beautiful Bill Act (OBBBA) where it applies.\n\n' +
       'GROUND TRUTH: If a CORRECT ANSWER and a BOOK EXPLANATION are provided below, treat them as authoritative — ' +
       'never re-derive the answer or contradict the book, and expand on the book explanation if it is brief or unclear.\n\n' +
-      'STYLE: Use clean markdown — **bold** for key terms, ### for short section headings, - for bullet lists. ' +
+      'STYLE: Use clean markdown — **bold** for key terms, ### for short section headings, - for bullet lists, ' +
+      '1. 2. 3. for numbered lists. Put EVERY list item on its own line (a real line break before each - or ' +
+      'N.) — never run multiple items together on one line separated by " - " or numbers. ' +
       'End with a one-line "**Key takeaway:**" that captures the rule the student should memorize.\n\n' +
       'DO NOT emit LaTeX ($\\rightarrow$, $\\leq$, $\\alpha$, etc.). Write real characters: →, ≤, α. ' +
       'DO NOT restate the question back to the student verbatim — go straight into the explanation.\n\n' +
