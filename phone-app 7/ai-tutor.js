@@ -456,6 +456,17 @@
     _saveAllChats(all);
   }
 
+  // Different question pools label the same chapter differently: mocks and
+  // chapter questions use "SU 3: Authorizations and Disclosures" while Becker
+  // ("extra") questions use bare "Chapter 3" for that exact same chapter.
+  // Grouping stats by the raw unit string splits one chapter's performance
+  // into two separate entries instead of combining it, so extract the
+  // leading chapter NUMBER and group by that everywhere chapter stats are
+  // aggregated below — keeping whichever label is the richer "SU N: Name"
+  // form for display.
+  function _unitNum(u){ var m = /^(?:SU|Chapter)\s*(\d+)/i.exec(String(u||'').trim()); return m ? m[1] : null; }
+  function _unitKey(u){ var n = _unitNum(u); return n != null ? ('#' + n) : (u || 'Unknown'); }
+
   // ---- Learning profile + weak areas (computed live from all localStorage state) ----
   // Iterates every mock/mcq/extra key and counts wrong answers per topic + chapter.
   // Cheap enough to run on every send (~1000 questions max).
@@ -498,8 +509,9 @@
           const topic = q.topic || 'General';
           if (!out.byTopic[topic]) out.byTopic[topic] = { a: 0, r: 0 };
           out.byTopic[topic].a++; if (right) out.byTopic[topic].r++;
-          const chap = q.unit || 'Unknown';
-          if (!out.byChapter[chap]) out.byChapter[chap] = { a: 0, r: 0 };
+          const chapRaw = q.unit || 'Unknown', chap = _unitKey(chapRaw);
+          if (!out.byChapter[chap]) out.byChapter[chap] = { a: 0, r: 0, label: chapRaw };
+          else if (/^SU /i.test(chapRaw) && !/^SU /i.test(out.byChapter[chap].label || '')) out.byChapter[chap].label = chapRaw;
           out.byChapter[chap].a++; if (right) out.byChapter[chap].r++;
           if (!out.byPart[partNum]) out.byPart[partNum] = { a: 0, r: 0 };
           out.byPart[partNum].a++; if (right) out.byPart[partNum].r++;
@@ -515,7 +527,7 @@
   // Collect the ACTUAL wrong/flagged questions across all parts, grouped by chapter/topic,
   // so the tutor can point at specific items instead of just aggregate stats.
   function _collectWrongFlagged(){
-    const out = { wrongByChap: {}, flagByChap: {}, wrongByTopic: {}, wrongSamples: [], totalWrong: 0, totalFlagged: 0 };
+    const out = { wrongByChap: {}, flagByChap: {}, wrongByTopic: {}, wrongSamples: [], totalWrong: 0, totalFlagged: 0, chapLabel: {} };
     try {
       const parts = (typeof PARTS !== 'undefined') ? PARTS : null;
       if (!parts) return out;
@@ -538,14 +550,15 @@
         if (!Array.isArray(questions)) continue;
         s.answers.forEach((v, j) => {
           const q = questions[j]; if (!q) return;
-          const chap = q.unit || 'Unknown';
+          const chapRaw = q.unit || 'Unknown', chap = _unitKey(chapRaw);
+          if (!out.chapLabel[chap] || (/^SU /i.test(chapRaw) && !/^SU /i.test(out.chapLabel[chap]))) out.chapLabel[chap] = chapRaw;
           const topic = q.topic || 'General';
           if (v !== null && v !== undefined && v !== q.a) {
             out.totalWrong++;
             out.wrongByChap[chap]  = (out.wrongByChap[chap]  || 0) + 1;
             out.wrongByTopic[topic] = (out.wrongByTopic[topic] || 0) + 1;
             if (out.wrongSamples.length < 10) {
-              out.wrongSamples.push({ chap, topic, q: String(q.q || '').slice(0, 100) });
+              out.wrongSamples.push({ chap: chapRaw, topic, q: String(q.q || '').slice(0, 100) });
             }
           }
           if (s.flags && s.flags[j]) {
@@ -567,7 +580,7 @@
       // Compute rankings once
       const chapters = Object.entries(s.byChapter)
         .filter(([, v]) => v.a >= 3)
-        .map(([k, v]) => ({ k, acc: v.r / v.a, a: v.a, r: v.r }))
+        .map(([k, v]) => ({ k: (v.label !== undefined ? v.label : k), acc: v.r / v.a, a: v.a, r: v.r }))
         .sort((a, b) => a.acc - b.acc);
       const topics = Object.entries(s.byTopic)
         .filter(([, v]) => v.a >= 3)
@@ -597,7 +610,7 @@
           .slice(0, 6);
         if (wrongChapRows.length) {
           out += '- Chapters with the MOST wrong answers: ' + wrongChapRows.map(([c, n]) =>
-            c + ' (' + n + ' wrong)'
+            (wf.chapLabel[c] || c) + ' (' + n + ' wrong)'
           ).join('; ') + '.\n';
         }
         // Chapters ranked by flag count
@@ -606,7 +619,7 @@
           .slice(0, 5);
         if (flagChapRows.length) {
           out += '- Chapters with the MOST flagged questions: ' + flagChapRows.map(([c, n]) =>
-            c + ' (' + n + ' flagged)'
+            (wf.chapLabel[c] || c) + ' (' + n + ' flagged)'
           ).join('; ') + '.\n';
         }
         // Weakest by accuracy (chapters and topics with ≥3 attempts)
@@ -635,12 +648,14 @@
       const currentTopic = (currentQ && currentQ.topic) || '';
       const currentUnit  = (currentQ && currentQ.unit)  || '';
       const topicStats = s.byTopic[currentTopic];
-      const unitStats  = s.byChapter[currentUnit];
+      // s.byChapter is now keyed by normalized chapter number (see _unitKey
+      // above), not the raw unit string, so look it up the same way.
+      const unitStats  = s.byChapter[_unitKey(currentUnit)];
       const topicWeak = topicStats && topicStats.a >= 3 && (topicStats.r / topicStats.a) < 0.7;
       const unitWeak  = unitStats  && unitStats.a  >= 3 && (unitStats.r  / unitStats.a ) < 0.7;
       if (!topicWeak && !unitWeak) return '';
       let out = 'LEARNING PROFILE (this question is in a weak area for the student):\n';
-      if (unitWeak)  out += '- Weak chapter: ' + currentUnit  + ' — ' + unitStats.r  + '/' + unitStats.a  + ' correct (' + Math.round(100 * unitStats.r  / unitStats.a)  + '%).\n';
+      if (unitWeak)  out += '- Weak chapter: ' + (unitStats.label || currentUnit) + ' — ' + unitStats.r  + '/' + unitStats.a  + ' correct (' + Math.round(100 * unitStats.r  / unitStats.a)  + '%).\n';
       if (topicWeak) out += '- Weak topic: '   + currentTopic + ' — ' + topicStats.r + '/' + topicStats.a + ' correct (' + Math.round(100 * topicStats.r / topicStats.a) + '%).\n';
       out += '(Name this connection explicitly and teach the underlying rule, not just the answer.)\n\n';
       return out;
