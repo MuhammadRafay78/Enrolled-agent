@@ -1002,11 +1002,22 @@ function showDashboard(){
   document.getElementById('score').textContent='';
   document.getElementById('prog').style.width='0%';
   const units={},topics={};let tA=0,tR=0;
+  // Different question pools label the same chapter differently — mocks and
+  // chapter questions use "SU 3: Authorizations and Disclosures" while Becker
+  // questions use bare "Chapter 3" for that exact same chapter. Grouping by
+  // the raw unit string (as this used to) split one chapter's performance
+  // into two separate "By Study Unit" rows instead of combining it into one
+  // accurate score, so group by the leading chapter NUMBER instead, keeping
+  // whichever label is the richer "SU N: Name" form for display.
+  const unitNum=function(u){var m=/^(?:SU|Chapter)\s*(\d+)/i.exec(String(u||'').trim());return m?m[1]:null;};
   const fold=function(qs,ans){
     qs.forEach(function(q,i){
       const v=ans[i];if(v===null||v===undefined)return;
       const r=v===q.a;tA++;if(r)tR++;
-      units[q.unit]=units[q.unit]||{a:0,r:0};units[q.unit].a++;if(r)units[q.unit].r++;
+      const n=unitNum(q.unit),key=n!=null?('#'+n):(q.unit||'');
+      if(!units[key])units[key]={a:0,r:0,label:q.unit};
+      else if(/^SU /i.test(q.unit||'')&&!/^SU /i.test(units[key].label||''))units[key].label=q.unit;
+      units[key].a++;if(r)units[key].r++;
       topics[q.topic]=topics[q.topic]||{a:0,r:0};topics[q.topic].a++;if(r)topics[q.topic].r++;
     });
   };
@@ -1017,7 +1028,10 @@ function showDashboard(){
     card.innerHTML='<div class="end"><h2>📊 My Performance</h2><p style="margin:14px 0">No answers recorded yet — answer some questions in any mock or chapter, then check back here to see your strongest and weakest areas.</p>'+timeReport()+'<button class="restart" id="menu">Exam Menu</button></div>';
     document.getElementById('menu').onclick=showMenu;return;
   }
-  const rows=function(obj,minA){return Object.entries(obj).map(function(en){const p=Math.round(en[1].r/en[1].a*100);return{u:en[0],a:en[1].a,r:en[1].r,p:p};}).filter(function(x){return x.a>=minA;}).sort(function(x,y){return x.p-y.p;});};
+  // .label (set only on units{} entries, see fold() above) is the canonical
+  // display name for a unit row; topics{} entries have no .label and fall
+  // back to the raw key, unaffected by the units-only normalization above.
+  const rows=function(obj,minA){return Object.entries(obj).map(function(en){const p=Math.round(en[1].r/en[1].a*100);return{u:(en[1].label!==undefined?en[1].label:en[0]),a:en[1].a,r:en[1].r,p:p};}).filter(function(x){return x.a>=minA;}).sort(function(x,y){return x.p-y.p;});};
   const uRows=rows(units,1);
   const tRows=rows(topics,2).slice(0,15);
   const bar=function(p){const col=p>=75?'var(--green)':(p>=50?'#f59e0b':'var(--red)');return '<div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden;min-width:80px"><div style="height:100%;width:'+p+'%;background:'+col+'"></div></div>';};
