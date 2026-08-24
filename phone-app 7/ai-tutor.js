@@ -1443,6 +1443,11 @@
       'STYLE: Use clean markdown — **bold** for key terms, ### for short section headings, - for bullet lists, ' +
       '1. 2. 3. for numbered lists. Put EVERY list item on its own line (a real line break before each - or ' +
       'N.) — never run multiple items together on one line separated by " - " or numbers. ' +
+      'Whenever you enumerate several parallel items that each have a name/label and a description or set of ' +
+      'attributes (e.g. divisions of an organization, filing statuses, categories with definitions, entities being ' +
+      'compared) — use a real markdown table instead of a run-on sentence: a header row, a "|---|---|" separator ' +
+      'row, then one data row per item, each on its own line. Never pack multiple labeled items into a single ' +
+      'paragraph separated by semicolons or em dashes. ' +
       (skipKeyTakeaway ? '' :
       'End with a one-line "**Key takeaway:**" that captures the rule the student should memorize.\n\n') +
       'DO NOT emit LaTeX ($\\rightarrow$, $\\leq$, $\\alpha$, etc.). Write real characters: →, ≤, α. ' +
