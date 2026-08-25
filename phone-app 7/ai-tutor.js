@@ -1493,8 +1493,17 @@
       const boldMarkers = (t.match(/\*\*/g) || []).length;
       if (boldMarkers % 2 !== 0) return true;
       const last = t.slice(-1);
-      if (!/[.!?"'\)\]:*`]/.test(last)) return true;
-      if (!skipKeyTakeaway && t.length > 150 && !/key takeaway/i.test(t)) return true;
+      // A complete markdown table's last row legitimately ends in "|" — since
+      // the STYLE prompt now asks for tables on parallel/comparison content,
+      // a real finished answer can end there instead of on sentence
+      // punctuation. Without this, every such answer looked "truncated" and
+      // got retried until all 5 attempts failed ("AI is busy").
+      if (!/[.!?"'\)\]:*`|]/.test(last)) return true;
+      // A markdown table (header row + a "|---|---|" separator row) is
+      // itself the compact recap for that turn — don't also demand a
+      // trailing "Key takeaway" line on top of it.
+      const hasTable = /\|.*\|[^\n]*\n\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*(\n|$)/.test(t);
+      if (!skipKeyTakeaway && !hasTable && t.length > 150 && !/key takeaway/i.test(t)) return true;
       return false;
     }
 
