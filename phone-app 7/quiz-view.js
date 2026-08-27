@@ -33,6 +33,7 @@ function renderSide(){
     (canReveal()?'<button class="side-btn'+(st.revealAll?' on':'')+'" id="sbRevealAll">👁 '+(st.revealAll?'Hide all answers':'Show all answers')+'</button>':'')+
     '<button class="side-btn" id="sbResults">'+(st.mode==='exam'&&!st.examDone?'Submit Exam':'Results')+'</button>'+
     (st.flags.some(Boolean)?'<button class="side-btn" id="sbFlag">Next flagged ⚑</button>':'')+
+    (feedbackOn()&&st.answers.some(function(v,i){return v!==null&&v!==QUESTIONS[i].a;})?'<button class="side-btn" id="sbWrong">Next wrong ✗</button>':'')+
     (st.review?'':'<button class="side-btn" id="sbReset">Reset progress</button>')+
     '<button class="side-btn" id="sbMenu">← Go back</button>';
   side.querySelectorAll('[data-j]').forEach(function(b){b.onclick=function(){pos=+b.dataset.j;side.classList.remove('open');renderSide();render();scrollTop();};});
@@ -50,6 +51,21 @@ function renderSide(){
   if(fbtn)fbtn.onclick=function(){
     for(let k=1;k<=st.order.length;k++){const p2=(pos+k)%st.order.length;if(st.flags[st.order[p2]]){pos=p2;break;}}
     side.classList.remove('open');renderSide();render();scrollTop();
+  };
+  const wbtn=document.getElementById('sbWrong');
+  if(wbtn)wbtn.onclick=function(){
+    for(let k=1;k<=st.order.length;k++){
+      const p2=(pos+k)%st.order.length;const qi=st.order[p2];
+      if(st.answers[qi]!==null&&st.answers[qi]!==QUESTIONS[qi].a){
+        pos=p2;
+        // Clear the stored (wrong) answer so the question is immediately
+        // re-attemptable, instead of just landing on the graded view of it.
+        st.answers[qi]=null;
+        setRevealed(qi,false);
+        break;
+      }
+    }
+    saveState();side.classList.remove('open');renderSide();render();headerScore();scrollTop();
   };
   const rbtn=document.getElementById('sbReset');
   if(rbtn)rbtn.onclick=function(){exam===-3?resetChapter():(exam===-4?resetMcqNow():resetExam(exam));};
