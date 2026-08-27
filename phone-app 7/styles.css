@@ -183,6 +183,14 @@
   .nsum-nums{list-style:none;margin:6px 0 0;padding:0;}
   .nsum-nums li{margin:0 0 4px;padding:6px 10px;background:var(--bg);border-radius:8px;font-size:13px;color:var(--muted);line-height:1.5;}
   .nsum-nums li b{color:var(--ink);}
+  /* Lighter alternative to .nsum-nums for longer, multi-sentence enumerated
+     items (e.g. a chapter-summary list of penalty/relief types) — a run of
+     heavy grey boxes there reads as noisy, so this uses a thin divider and a
+     small bullet dot instead, matching .nsum-list's plainer feel. */
+  .nsum-plain{list-style:none;margin:6px 0 0;padding:0;}
+  .nsum-plain li{position:relative;padding:6px 0 6px 15px;font-size:13.5px;color:var(--ink);line-height:1.5;border-bottom:1px solid var(--border);}
+  .nsum-plain li:last-child{border-bottom:none;}
+  .nsum-plain li::before{content:"";position:absolute;left:2px;top:14px;width:5px;height:5px;border-radius:50%;background:var(--muted);}
   .nnote{background:#fff7ed;border-left:4px solid #f59e0b;padding:8px 12px;border-radius:0 8px 8px 0;font-size:14px;}
   body.is-dark .nnote{background:#3a2c10;}
   .nlist{margin:4px 0 10px 20px;font-size:14.5px;}
