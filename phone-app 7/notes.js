@@ -676,11 +676,14 @@ function notesBookIndex(order,activeUnit){
   var h='<button class="side-close" id="sideClose">✕ Close</button>';
   h+='<div id="bookChapterJump">'+notesBookChapterJumpHTML(activeUnit)+'</div>';
   h+='<div style="margin:14px 0 10px;border-top:1px solid var(--border)"></div>';
-  h+='<div class="side-hd" style="position:sticky;top:-12px">'+esc(PARTS[PART].name)+' — Chapters</div>';
   // Current revision lap, not the all-time "ever opened" set — this highlight
   // is meant to reset each time a full pass through the Part completes, same
   // as the "Full revisions" counter it's tracking progress toward.
   var lapSet=(summaryCyclesAll()[PART]||{}).current||{};
+  h+='<div class="side-hd" style="position:sticky;top:-12px;display:flex;justify-content:space-between;align-items:center;gap:6px">'+
+     '<span>'+esc(PARTS[PART].name)+' — Chapters</span>'+
+     (Object.keys(lapSet).length?'<span class="lbl-reset" id="notesBookLapReset" title="Clear the green ‘reviewed this lap’ highlight for every chapter in '+esc(PARTS[PART].name)+'">↺ reset</span>':'')+
+     '</div>';
   order.forEach(function(n){
     h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+(lapSet[n]?' reviewed':'')+'" data-jumpchapter="'+n+'" style="text-align:left">'+(isWeakChapter(n)?'<span class="wkmark">🚩 </span>':'')+'SU '+n+': '+esc(CHNOTES[PART][n].t)+'</button>';
   });
@@ -823,6 +826,14 @@ function showNotesBook(startUnit){
   });
   var sc=document.getElementById('sideClose'); if(sc)sc.onclick=function(){side.classList.remove('open');};
   var bb=document.getElementById('notesBookBack'); if(bb)bb.onclick=function(){ notesUnitList(); };
+  var lrb=document.getElementById('notesBookLapReset');
+  if(lrb)lrb.onclick=async function(){
+    if(!confirm('Clear the green "reviewed this lap" highlight for every chapter in '+PARTS[PART].name+'? This also resets the "Full revisions" count for this Part back to 0. Your permanent chapters-reviewed history is not affected. This cannot be undone.'))return;
+    var r=await resetCyclesForPart(PART,Object.keys(C).length);
+    if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+    side.querySelectorAll('[data-jumpchapter]').forEach(function(b){b.classList.remove('reviewed');});
+    lrb.remove();
+  };
   var bsIn=document.getElementById('bookSearch'), bsBox=document.getElementById('bookSearchRes');
   bsIn.oninput=function(){
     var q=bsIn.value.trim().toLowerCase();
@@ -866,6 +877,7 @@ function notesUnitList(){
   // Current revision lap, not the all-time "ever opened" set — resets each
   // time a full pass through the Part completes (see notesBookIndex above).
   var lapSet=(summaryCyclesAll()[PART]||{}).current||{};
+  if(Object.keys(lapSet).length)h+='<div style="text-align:right;margin:-4px 0 8px"><span class="lbl-reset" id="nulLapReset" title="Clear the green \'reviewed this lap\' highlight for every chapter in '+esc(PARTS[PART].name)+'">↺ reset reviewed highlights</span></div>';
   Object.keys(C).sort(function(a,b){return a-b;}).forEach(function(n){
     var u=C[n];
     var nq=(BOOKQ[PART]&&BOOKQ[PART][n])?BOOKQ[PART][n].length:0;
@@ -875,6 +887,14 @@ function notesUnitList(){
   card.innerHTML=h;
   card.querySelectorAll('[data-nu]').forEach(function(b){b.onclick=function(){showNotesBook(b.dataset.nu);};});
   document.getElementById('nulBack').onclick=showMenu;
+  var nulReset=document.getElementById('nulLapReset');
+  if(nulReset)nulReset.onclick=async function(){
+    if(!confirm('Clear the green "reviewed this lap" highlight for every chapter in '+PARTS[PART].name+'? This also resets the "Full revisions" count for this Part back to 0. Your permanent chapters-reviewed history is not affected. This cannot be undone.'))return;
+    var r=await resetCyclesForPart(PART,Object.keys(C).length);
+    if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+    card.querySelectorAll('.opt.reviewed').forEach(function(b){b.classList.remove('reviewed');});
+    nulReset.parentElement.remove();
+  };
 }
 
 // ============================================================================
