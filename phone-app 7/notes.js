@@ -991,8 +991,10 @@ function showNotesBook(startUnit){
   var lrb=document.getElementById('notesBookLapReset');
   if(lrb)lrb.onclick=async function(){
     if(!confirm('Clear the green "reviewed this lap" highlight for every chapter in '+PARTS[PART].name+'? This also resets the "Full revisions" count for this Part back to 0. Your permanent chapters-reviewed history is not affected. This cannot be undone.'))return;
-    var r=await resetCyclesForPart(PART,Object.keys(C).length);
-    if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+    try{
+      var r=await resetCyclesForPart(PART,Object.keys(C).length);
+      if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+    }catch(e){ alert('Reset failed — try again.'); return; }
     side.querySelectorAll('[data-jumpchapter]').forEach(function(b){b.classList.remove('reviewed');});
     side.querySelectorAll('[data-resetchapter]').forEach(function(b){b.remove();});
     lrb.remove();
@@ -1000,8 +1002,10 @@ function showNotesBook(startUnit){
   side.querySelectorAll('[data-resetchapter]').forEach(function(rb){
     rb.onclick=async function(){
       var n=rb.dataset.resetchapter;
-      var r=await resetCycleForChapter(PART,n);
-      if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+      try{
+        var r=await resetCycleForChapter(PART,n);
+        if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+      }catch(e){ alert('Reset failed — try again.'); return; }
       var chBtn=side.querySelector('[data-jumpchapter="'+n+'"]');
       if(chBtn)chBtn.classList.remove('reviewed');
       rb.remove();
@@ -1073,8 +1077,10 @@ function notesUnitList(){
   var nulReset=document.getElementById('nulLapReset');
   if(nulReset)nulReset.onclick=async function(){
     if(!confirm('Clear the green "reviewed this lap" highlight for every chapter in '+PARTS[PART].name+'? This also resets the "Full revisions" count for this Part back to 0. Your permanent chapters-reviewed history is not affected. This cannot be undone.'))return;
-    var r=await resetCyclesForPart(PART,Object.keys(C).length);
-    if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+    try{
+      var r=await resetCyclesForPart(PART,Object.keys(C).length);
+      if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+    }catch(e){ alert('Reset failed — try again.'); return; }
     card.querySelectorAll('.opt.reviewed').forEach(function(b){b.classList.remove('reviewed');});
     card.querySelectorAll('[data-resetchapter]').forEach(function(b){b.remove();});
     nulReset.parentElement.remove();
@@ -1082,8 +1088,10 @@ function notesUnitList(){
   card.querySelectorAll('[data-resetchapter]').forEach(function(rb){
     rb.onclick=async function(){
       var n=rb.dataset.resetchapter;
-      var r=await resetCycleForChapter(PART,n);
-      if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+      try{
+        var r=await resetCycleForChapter(PART,n);
+        if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+      }catch(e){ alert('Reset failed — try again.'); return; }
       var optBtn=card.querySelector('[data-nu="'+n+'"]');
       if(optBtn)optBtn.classList.remove('reviewed');
       rb.remove();
