@@ -229,6 +229,161 @@ function _normalizeSecLabel(s){
     .replace(/[“”]/g,'"')
     .trim();
 }
+// ---------- Chapter Summary text highlighter ----------
+// Lets a student mark up phrases in the Chapter Summary with a highlight
+// color, like a real highlighter pen. Device-local (same as notesSecState) —
+// this is a personal study mark-up, not scored progress worth syncing.
+// Storage is by exact highlighted substring rather than a DOM range/offset,
+// because chapterSummaryHTML() rebuilds its HTML from data.js fresh on every
+// render — a saved character offset would drift the moment the underlying
+// text changes (a book-content fix, a table added, etc.), silently
+// highlighting the wrong words. A saved phrase always finds itself again (or
+// harmlessly finds nothing, if it was removed from the text).
+var HL_COLORS=['yellow','green','blue','pink'];
+var CURRENT_NOTES_CHAPTER=null; // set by showNotes(); lets the highlighter know which chapter is on screen in the single-chapter view, whose #secbody-summary id doesn't embed the chapter number the way the book-scroll view's #secbody-<n>-summary does
+function hlKey(){return 'ea3quiz_hl_p'+PART;}
+function hlState(){try{return JSON.parse(localStorage.getItem(hlKey()))||{};}catch(e){return {};}}
+function hlSaveState(s){try{localStorage.setItem(hlKey(),JSON.stringify(s));}catch(e){}}
+function hlGet(n){return (hlState()[n])||[];}
+function hlAdd(n,text,color){
+  text=text.trim(); if(!text)return;
+  var s=hlState(); if(!s[n])s[n]=[];
+  var existing=s[n].find(function(h){return h.t===text;});
+  if(existing)existing.c=color; else s[n].push({t:text,c:color});
+  hlSaveState(s);
+}
+function hlRemove(n,text){
+  var s=hlState(); if(!s[n])return;
+  s[n]=s[n].filter(function(h){return h.t!==text;});
+  hlSaveState(s);
+}
+// Strips every <mark class="hl"> back to plain text, merging text nodes back
+// together — always run before re-wrapping so re-applying highlights is
+// idempotent (never double-wraps, never leaves a stale wrapper behind for a
+// highlight that was removed elsewhere).
+function hlUnwrap(container){
+  container.querySelectorAll('mark.hl').forEach(function(m){
+    var parent=m.parentNode; if(!parent)return;
+    while(m.firstChild)parent.insertBefore(m.firstChild,m);
+    parent.removeChild(m);
+    parent.normalize();
+  });
+}
+// Re-applies every stored highlight for chapter n inside container. Matches
+// a saved phrase against a single text node's content — a phrase that lives
+// entirely within one run of plain (or one run of bold, etc.) text always
+// restores; one that was originally selected straddling a formatting
+// boundary (e.g. across a <b>...</b>) won't be found here and just stays
+// unhighlighted on re-render, since a single text node never contains it.
+// That's a soft miss, not a broken state — the entry stays saved in case a
+// future re-render makes the phrase contiguous again.
+function hlApply(container,n){
+  if(!container)return;
+  hlUnwrap(container);
+  var list=hlGet(n);
+  if(!list.length)return;
+  list.forEach(function(h){
+    var walker=document.createTreeWalker(container,NodeFilter.SHOW_TEXT,null);
+    var node;
+    while(node=walker.nextNode()){
+      var idx=node.nodeValue.indexOf(h.t);
+      if(idx===-1)continue;
+      var range=document.createRange();
+      range.setStart(node,idx);
+      range.setEnd(node,idx+h.t.length);
+      var mark=document.createElement('mark');
+      mark.className='hl hl-'+h.c;
+      mark.dataset.hlText=h.t;
+      try{range.surroundContents(mark);}catch(e){}
+      break; // one restore per saved entry — enough for a highlighted phrase
+    }
+  });
+}
+var hlToolbarEl=null;
+function hlToolbar(){
+  if(hlToolbarEl)return hlToolbarEl;
+  var el=document.createElement('div');
+  el.id='hlToolbar';
+  el.className='hltoolbar';
+  el.innerHTML=HL_COLORS.map(function(c){return '<button type="button" class="hlswatch hlswatch-'+c+'" data-c="'+c+'" title="Highlight '+c+'"></button>';}).join('');
+  document.body.appendChild(el);
+  hlToolbarEl=el;
+  return el;
+}
+function hlHideToolbar(){if(hlToolbarEl)hlToolbarEl.style.display='none';}
+function hlShowToolbarFor(range,onPick){
+  var el=hlToolbar();
+  el.style.display='flex'; // must be visible before measuring offsetWidth below
+  var rect=range.getBoundingClientRect();
+  var top=window.scrollY+rect.top-46;
+  var left=window.scrollX+rect.left+(rect.width/2)-(el.offsetWidth/2);
+  el.style.top=Math.max(8,top)+'px';
+  el.style.left=Math.max(8,Math.min(left,window.scrollX+document.documentElement.clientWidth-el.offsetWidth-8))+'px';
+  el.querySelectorAll('[data-c]').forEach(function(b){
+    b.onclick=function(e){e.stopPropagation();onPick(b.dataset.c);hlHideToolbar();};
+  });
+}
+// Figures out which chapter's summary (and its container) a given element
+// sits inside, across both places Chapter Summary renders: the single-
+// chapter view (id="secbody-summary", chapter number tracked separately in
+// CURRENT_NOTES_CHAPTER) and the continuous book-scroll view (one container
+// per chapter, id="secbody-<n>-summary").
+function hlSectionContext(target){
+  var list=target.closest && target.closest('.nsum-list');
+  if(!list)return null;
+  var body=list.closest('.secbody');
+  if(!body)return null;
+  var m=/^secbody-(?:(\d+)-)?summary$/.exec(body.id);
+  if(!m)return null;
+  var n=m[1]||CURRENT_NOTES_CHAPTER;
+  if(!n)return null;
+  return {n:String(n),body:body};
+}
+function hlOnSelectionEnd(){
+  var sel=window.getSelection();
+  if(!sel||sel.isCollapsed||sel.rangeCount===0){hlHideToolbar();return;}
+  var text=sel.toString().trim();
+  if(!text||text.length<2){hlHideToolbar();return;}
+  var range=sel.getRangeAt(0);
+  var anchorEl=range.commonAncestorContainer;
+  if(anchorEl.nodeType===3)anchorEl=anchorEl.parentElement;
+  var ctx=anchorEl&&hlSectionContext(anchorEl);
+  if(!ctx){hlHideToolbar();return;}
+  // A selection dragged across two <li>/<td> cells would make extractContents()
+  // below splice content out of one and re-home it inside the other's <mark> —
+  // silently corrupting the list/table. Require both ends of the selection to
+  // sit inside the same list item or table cell (or neither, for a plain
+  // paragraph run) before allowing a highlight.
+  var startCell=range.startContainer.nodeType===3?range.startContainer.parentElement:range.startContainer;
+  var endCell=range.endContainer.nodeType===3?range.endContainer.parentElement:range.endContainer;
+  startCell=startCell&&startCell.closest('li,td');
+  endCell=endCell&&endCell.closest('li,td');
+  if(startCell!==endCell){hlHideToolbar();return;}
+  hlShowToolbarFor(range,function(color){
+    hlAdd(ctx.n,text,color);
+    var mark=document.createElement('mark');
+    mark.className='hl hl-'+color;
+    mark.dataset.hlText=text;
+    try{
+      mark.appendChild(range.extractContents());
+      range.insertNode(mark);
+    }catch(e){}
+    try{sel.removeAllRanges();}catch(e2){}
+  });
+}
+document.addEventListener('mouseup',hlOnSelectionEnd);
+document.addEventListener('touchend',hlOnSelectionEnd);
+// Tap an existing highlight to remove it — a highlighter mark is low-stakes
+// and one tap to redo, so this skips a confirm dialog on purpose.
+document.addEventListener('click',function(e){
+  var m=e.target.closest&&e.target.closest('mark.hl');
+  if(!m)return;
+  var ctx=hlSectionContext(m);
+  if(!ctx)return;
+  e.stopPropagation();
+  hlRemove(ctx.n,m.dataset.hlText||m.textContent);
+  hlApply(ctx.body,ctx.n);
+});
 function chapterSummaryHTML(u){
   var titleBySec={};
   u.s.forEach(function(s){ titleBySec[_normalizeSecLabel(s.t)]=s.t; });
@@ -266,6 +421,7 @@ function showNotes(n,backFn){
   n=String(n);
   var C=CHNOTES[PART];
   if(!C||!C[n]){card.innerHTML='<div class="end"><h2>📘 Chapter Notes</h2><p style="margin:14px 0">No notes are loaded for this chapter.</p><button class="restart" id="menu">Exam Menu</button></div>';document.getElementById('menu').onclick=showMenu;return;}
+  CURRENT_NOTES_CHAPTER=n;
   if(backFn)NOTEBACK=backFn;
   stopTimer();stopClock();
   var u=C[n];
@@ -341,6 +497,7 @@ function showNotes(n,backFn){
   h+=bookqHTML(n);
   h+='<div class="nav2"><button class="navbtn" id="notesBack2">← Back</button><span></span></div>';
   card.innerHTML=h;
+  hlApply(document.getElementById('secbody-summary'),n);
   wireBookq(n);
   var fcBtn=document.getElementById('chapterFcBtn');
   if(fcBtn)fcBtn.onclick=function(){ startChapterFlashcards(n); };
@@ -590,6 +747,7 @@ function chapterBlockHTML(n){
 function wireChapterBlock(n){
   var root=document.getElementById('chbk-'+n);
   if(!root)return;
+  hlApply(document.getElementById('secbody-'+n+'-summary'),n);
   var fcBtn=root.querySelector('[data-fcunit="'+n+'"]');
   if(fcBtn)fcBtn.onclick=function(){ startChapterFlashcards(n,function(){ showNotesBook(n); }); };
   wireBookqScoped(n,root);

@@ -191,6 +191,23 @@
   .nsum-plain li{position:relative;padding:6px 0 6px 15px;font-size:13.5px;color:var(--ink);line-height:1.5;border-bottom:1px solid var(--border);}
   .nsum-plain li:last-child{border-bottom:none;}
   .nsum-plain li::before{content:"";position:absolute;left:2px;top:14px;width:5px;height:5px;border-radius:50%;background:var(--muted);}
+  /* Chapter Summary text highlighter — floating color-pick popup, shown near
+     a text selection, plus the four highlight-mark colors it applies. */
+  .hltoolbar{display:none;position:absolute;z-index:9998;gap:6px;padding:6px;background:var(--card);border:1px solid var(--border);border-radius:20px;box-shadow:0 6px 20px rgba(0,0,0,.25);}
+  .hlswatch{width:26px;height:26px;border-radius:50%;border:2px solid rgba(0,0,0,.12);cursor:pointer;padding:0;}
+  .hlswatch-yellow{background:#fde047;}
+  .hlswatch-green{background:#86efac;}
+  .hlswatch-blue{background:#93c5fd;}
+  .hlswatch-pink{background:#f9a8d4;}
+  mark.hl{border-radius:3px;padding:0 1px;cursor:pointer;color:inherit;}
+  mark.hl-yellow{background:#fef08a;}
+  mark.hl-green{background:#bbf7d0;}
+  mark.hl-blue{background:#bfdbfe;}
+  mark.hl-pink{background:#fbcfe8;}
+  body.is-dark mark.hl-yellow{background:#a16207;}
+  body.is-dark mark.hl-green{background:#15803d;}
+  body.is-dark mark.hl-blue{background:#1d4ed8;}
+  body.is-dark mark.hl-pink{background:#a21caf;}
   .nnote{background:#fff7ed;border-left:4px solid #f59e0b;padding:8px 12px;border-radius:0 8px 8px 0;font-size:14px;}
   body.is-dark .nnote{background:#3a2c10;}
   .nlist{margin:4px 0 10px 20px;font-size:14.5px;}
