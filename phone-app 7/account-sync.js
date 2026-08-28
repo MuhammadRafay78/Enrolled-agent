@@ -686,6 +686,35 @@ async function resetCyclesForPart(part, totalChapters){
   return {ok:true};
 }
 
+// Same idea as resetCyclesForPart, but clears just one chapter's "reviewed
+// this lap" flag instead of wiping the whole Part's current lap — for when
+// only a single chapter's highlight is wrong, not the whole revision count.
+// Leaves "Full revisions" (count) and every other chapter's lap progress
+// untouched.
+async function resetCycleForChapter(part, unit){
+  if(!auth())return {ok:false, msg:'Not signed in.'};
+  function apply(){
+    var cycles=JSON.parse(localStorage.getItem('ea3quiz_v2_summary_cycles')||'{}');
+    var p=cycles[part];
+    if(p&&p.current)delete p.current[unit];
+    localStorage.setItem('ea3quiz_v2_summary_cycles',JSON.stringify(cycles));
+  }
+  async function pushOnce(){
+    var m=JSON.parse(localStorage.getItem('ea3quiz_meta')||'{}');
+    var v=localStorage.getItem('ea3quiz_v2_summary_cycles');
+    var t=m['ea3quiz_v2_summary_cycles']||Date.now();
+    return apiRetry('/rest/v1/progress',{method:'POST',
+      headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},
+      body:JSON.stringify([{k:'ea3quiz_v2_summary_cycles',v:v,t:t}])});
+  }
+  apply();
+  await pushOnce();
+  await new Promise(function(res){setTimeout(res,1200);});
+  apply();
+  await pushOnce();
+  return {ok:true};
+}
+
 
 // A name plus a 4-digit PIN is mapped to a hidden account. Supabase needs an email and
 // password, so the name becomes a local-only address and the PIN becomes the password.
