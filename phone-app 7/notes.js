@@ -843,7 +843,11 @@ function notesBookIndex(order,activeUnit){
      (Object.keys(lapSet).length?'<span class="lbl-reset" id="notesBookLapReset" title="Clear the green ‘reviewed this lap’ highlight for every chapter in '+esc(PARTS[PART].name)+'">↺ reset</span>':'')+
      '</div>';
   order.forEach(function(n){
-    h+='<button class="side-btn'+(n===String(activeUnit)?' on':'')+(lapSet[n]?' reviewed':'')+'" data-jumpchapter="'+n+'" style="text-align:left">'+(isWeakChapter(n)?'<span class="wkmark">🚩 </span>':'')+'SU '+n+': '+esc(CHNOTES[PART][n].t)+'</button>';
+    var reviewed=!!lapSet[n];
+    h+='<div class="chrow">'+
+       '<button class="side-btn'+(n===String(activeUnit)?' on':'')+(reviewed?' reviewed':'')+'" data-jumpchapter="'+n+'" style="text-align:left">'+(isWeakChapter(n)?'<span class="wkmark">🚩 </span>':'')+'SU '+n+': '+esc(CHNOTES[PART][n].t)+'</button>'+
+       (reviewed?'<span class="chrow-reset" data-resetchapter="'+n+'" title="Clear the reviewed-this-lap highlight for just this chapter">↺</span>':'')+
+       '</div>';
   });
   h+='<button class="side-btn" id="notesBookBack" style="margin-top:10px">← Chapter list</button>';
   return h;
@@ -990,8 +994,25 @@ function showNotesBook(startUnit){
     var r=await resetCyclesForPart(PART,Object.keys(C).length);
     if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
     side.querySelectorAll('[data-jumpchapter]').forEach(function(b){b.classList.remove('reviewed');});
+    side.querySelectorAll('[data-resetchapter]').forEach(function(b){b.remove();});
     lrb.remove();
   };
+  side.querySelectorAll('[data-resetchapter]').forEach(function(rb){
+    rb.onclick=async function(){
+      var n=rb.dataset.resetchapter;
+      var r=await resetCycleForChapter(PART,n);
+      if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+      var chBtn=side.querySelector('[data-jumpchapter="'+n+'"]');
+      if(chBtn)chBtn.classList.remove('reviewed');
+      rb.remove();
+      // If that was the last reviewed chapter, the "reset all" link has
+      // nothing left to do either.
+      if(!side.querySelector('[data-resetchapter]')){
+        var lrb2=document.getElementById('notesBookLapReset');
+        if(lrb2)lrb2.remove();
+      }
+    };
+  });
   var bsIn=document.getElementById('bookSearch'), bsBox=document.getElementById('bookSearchRes');
   bsIn.oninput=function(){
     var q=bsIn.value.trim().toLowerCase();
@@ -1039,7 +1060,11 @@ function notesUnitList(){
   Object.keys(C).sort(function(a,b){return a-b;}).forEach(function(n){
     var u=C[n];
     var nq=(BOOKQ[PART]&&BOOKQ[PART][n])?BOOKQ[PART][n].length:0;
-    h+='<button class="opt'+(isWeakChapter(n)?' weak':'')+(lapSet[n]?' reviewed':'')+'" data-nu="'+n+'"><b>'+(isWeakChapter(n)?'🚩 ':'')+'SU '+n+': '+esc(u.t)+'</b><br><span style="color:var(--muted);font-size:13px">'+u.s.length+' sections · '+u.f.length+' forms · '+u.k.length+' key numbers'+(nq?' · '+nq+' study questions':'')+'</span></button>';
+    var reviewed=!!lapSet[n];
+    h+='<div class="chrow">'+
+       '<button class="opt'+(isWeakChapter(n)?' weak':'')+(reviewed?' reviewed':'')+'" data-nu="'+n+'"><b>'+(isWeakChapter(n)?'🚩 ':'')+'SU '+n+': '+esc(u.t)+'</b><br><span style="color:var(--muted);font-size:13px">'+u.s.length+' sections · '+u.f.length+' forms · '+u.k.length+' key numbers'+(nq?' · '+nq+' study questions':'')+'</span></button>'+
+       (reviewed?'<span class="chrow-reset" data-resetchapter="'+n+'" title="Clear the reviewed-this-lap highlight for just this chapter">↺</span>':'')+
+       '</div>';
   });
   h+='<div class="nav2"><button class="navbtn" id="nulBack">← Exam Menu</button><span></span></div>';
   card.innerHTML=h;
@@ -1051,8 +1076,23 @@ function notesUnitList(){
     var r=await resetCyclesForPart(PART,Object.keys(C).length);
     if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
     card.querySelectorAll('.opt.reviewed').forEach(function(b){b.classList.remove('reviewed');});
+    card.querySelectorAll('[data-resetchapter]').forEach(function(b){b.remove();});
     nulReset.parentElement.remove();
   };
+  card.querySelectorAll('[data-resetchapter]').forEach(function(rb){
+    rb.onclick=async function(){
+      var n=rb.dataset.resetchapter;
+      var r=await resetCycleForChapter(PART,n);
+      if(!r.ok){ alert(r.msg||'Reset failed — try again.'); return; }
+      var optBtn=card.querySelector('[data-nu="'+n+'"]');
+      if(optBtn)optBtn.classList.remove('reviewed');
+      rb.remove();
+      if(!card.querySelector('[data-resetchapter]')){
+        var nulReset2=document.getElementById('nulLapReset');
+        if(nulReset2)nulReset2.parentElement.remove();
+      }
+    };
+  });
 }
 
 // ============================================================================
