@@ -677,12 +677,12 @@ async function resetCyclesForPart(part, totalChapters){
       body:JSON.stringify([{k:'ea3quiz_v2_summary_cycles',v:v,t:t}])});
   }
   apply();
-  await pushOnce();
+  try{await pushOnce();}catch(e){}
   // Re-apply and push again after a short delay, to win any race against a
   // queued/in-flight background sync that might still be holding the old value.
   await new Promise(function(res){setTimeout(res,1200);});
   apply();
-  await pushOnce();
+  try{await pushOnce();}catch(e){}
   return {ok:true};
 }
 
@@ -708,10 +708,10 @@ async function resetCycleForChapter(part, unit){
       body:JSON.stringify([{k:'ea3quiz_v2_summary_cycles',v:v,t:t}])});
   }
   apply();
-  await pushOnce();
+  try{await pushOnce();}catch(e){}
   await new Promise(function(res){setTimeout(res,1200);});
   apply();
-  await pushOnce();
+  try{await pushOnce();}catch(e){}
   return {ok:true};
 }
 
