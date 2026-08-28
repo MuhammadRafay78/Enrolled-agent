@@ -493,10 +493,14 @@
   /* Per-chapter reset icon, sitting beside (not inside) a chapter's nav
      button — a nested <button> inside a <button> isn't valid HTML and would
      make the icon's click also fire the chapter-jump click underneath it. */
-  .chrow{display:flex;align-items:stretch;gap:5px;margin-top:8px;}
-  .chrow .side-btn,.chrow .opt{margin-top:0;flex:1;min-width:0;}
-  .chrow-reset{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:32px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--muted);cursor:pointer;font-size:14px;}
-  .chrow-reset:hover{color:var(--red);border-color:var(--red);}
+  /* A separate bordered box beside every reviewed chapter (the original
+     approach) doubled the box count on an already box-heavy mobile list —
+     this overlays a small round icon on the button's own right edge instead,
+     so a reviewed chapter still looks like one row, not two. */
+  .chrow{position:relative;margin-top:8px;}
+  .chrow .side-btn,.chrow .opt{margin-top:0;width:100%;padding-right:34px;box-sizing:border-box;}
+  .chrow-reset{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:14px;}
+  .chrow-reset:hover{color:var(--red);background:var(--bg);}
   .mtile{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px 10px;cursor:pointer;text-align:center;font-family:inherit;color:var(--ink);width:100%;}
   .mtile:hover{border-color:var(--blue);}
   .mtile:hover .mi{color:var(--blue);}
