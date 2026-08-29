@@ -45,6 +45,9 @@
 
   btn.onclick = () => {
     if (!_aiAllowed()) { _refreshAiVisibility(); return; }
+    // Always start from a blank chat on open — no replaying old conversations,
+    // this session's or a past one's, per request.
+    clearAiChat();
     panel.style.display = 'flex'; btn.style.display = 'none'; panel.classList.remove('minimized'); _setAiOpen(true);
     setTimeout(()=>input.focus(),100);
   };
@@ -161,17 +164,6 @@
       while (log.length > CHAT_LOG_MAX) log.shift();
       localStorage.setItem(CHAT_LOG_KEY, JSON.stringify(log));
     }catch(e){}
-  }
-  function _replayLogEntry(e){
-    const div = document.createElement('div');
-    div.className = 'ai-msg ' + (e.r === 'u' ? 'user' : 'bot');
-    if (e.r === 'u') div.textContent = e.t;
-    else div.innerHTML = e.t;
-    messages.appendChild(div);
-  }
-  function hydrateChatLog(){
-    _loadChatLog().forEach(_replayLogEntry);
-    messages.scrollTop = messages.scrollHeight;
   }
   const AI_GREETING_HTML = '<div class="ai-msg bot">Hi. Ask me about the current question or any EA exam topic. Tell me to "add this to my list" any time to save the current topic for later review.</div>';
   // Wipes the visible conversation and its persisted log (CHAT_LOG_KEY), back to
@@ -1737,8 +1729,5 @@
     } catch(e) {}
   });
 
-  // Must run after every const above has been initialized (not just hoisted) —
-  // called here at the bottom of the IIFE rather than near the top.
-  hydrateChatLog();
   updateStudyListBadge();
 })();
