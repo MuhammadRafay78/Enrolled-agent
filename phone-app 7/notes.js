@@ -406,9 +406,15 @@ function chapterSummaryHTML(u){
     // where a table genuinely reads clearer than another paragraph of prose.
     var gist=s.sum||_sectionGist(s);
     var nums=byTitle[s.t]||[];
+    // A hand-written .sum already folds in this section's key numbers as
+    // real prose (or a table) — re-listing the same "key numbers" facts
+    // underneath it just restates them a second time, near-verbatim, right
+    // below where they were already stated clearly. Only show this raw list
+    // as a fallback for a section that has no hand-written .sum yet, where
+    // it's the only place those numbers appear.
     h+='<li'+(s.l===3?' class="nsum-sub"':'')+'><b>'+esc(s.t)+'</b>'+(gist?' — '+(s.sum?_highlightNums(gist):esc(gist)):'')+
        (s.sumTable||'')+
-       (nums.length?'<ul class="nsum-nums">'+nums.map(function(t){return '<li>'+_highlightNums(t)+'</li>';}).join('')+'</ul>':'')+
+       (nums.length&&!s.sum?'<ul class="nsum-nums">'+nums.map(function(t){return '<li>'+_highlightNums(t)+'</li>';}).join('')+'</ul>':'')+
        '</li>';
   });
   if(unmatched.length){
