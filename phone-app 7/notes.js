@@ -305,13 +305,14 @@ function hlToolbar(){
   var el=document.createElement('div');
   el.id='hlToolbar';
   el.className='hltoolbar';
-  el.innerHTML=HL_COLORS.map(function(c){return '<button type="button" class="hlswatch hlswatch-'+c+'" data-c="'+c+'" title="Highlight '+c+'"></button>';}).join('');
+  el.innerHTML=HL_COLORS.map(function(c){return '<button type="button" class="hlswatch hlswatch-'+c+'" data-c="'+c+'" title="Highlight '+c+'"></button>';}).join('')+
+    '<span class="hltoolbar-sep"></span><button type="button" class="hlask" id="hlAskAi">✨ Ask AI</button>';
   document.body.appendChild(el);
   hlToolbarEl=el;
   return el;
 }
 function hlHideToolbar(){if(hlToolbarEl)hlToolbarEl.style.display='none';}
-function hlShowToolbarFor(range,onPick){
+function hlShowToolbarFor(range,onPick,onAsk){
   var el=hlToolbar();
   el.style.display='flex'; // must be visible before measuring offsetWidth below
   var rect=range.getBoundingClientRect();
@@ -322,6 +323,26 @@ function hlShowToolbarFor(range,onPick){
   el.querySelectorAll('[data-c]').forEach(function(b){
     b.onclick=function(e){e.stopPropagation();onPick(b.dataset.c);hlHideToolbar();};
   });
+  var askBtn=el.querySelector('#hlAskAi');
+  if(askBtn)askBtn.onclick=function(e){e.stopPropagation();onAsk();hlHideToolbar();};
+}
+// Opens the AI Tutor panel and sends a prompt about the given selected text —
+// mirrors quiz-view.js's _sendAiPrompt (same shared #ai-tutor-* DOM, just
+// triggered from a text selection here instead of a quiz question button).
+function hlAskAi(text){
+  var btn=document.getElementById('ai-tutor-btn');
+  var panel=document.getElementById('ai-tutor-panel');
+  var input=document.getElementById('ai-tutor-input');
+  var sendBtn=document.getElementById('ai-tutor-send');
+  if(!panel||!input||!sendBtn)return;
+  var wasOpen=(panel.style.display==='flex'&&!panel.classList.contains('minimized'));
+  if(!wasOpen&&btn&&btn.style.display!=='none'){btn.click();}
+  else if(panel.classList.contains('minimized')){
+    panel.classList.remove('minimized');
+    if(window.innerWidth>=1024)document.body.classList.add('ai-open');
+  }
+  input.value='Explain this for the EA exam: "'+text+'"';
+  setTimeout(function(){sendBtn.click();},80);
 }
 // Figures out which chapter's summary (and its container) a given element
 // sits inside, across both places Chapter Summary renders: the single-
@@ -369,6 +390,9 @@ function hlOnSelectionEnd(){
       range.insertNode(mark);
     }catch(e){}
     try{sel.removeAllRanges();}catch(e2){}
+  },function(){
+    hlAskAi(text);
+    try{sel.removeAllRanges();}catch(e3){}
   });
 }
 document.addEventListener('mouseup',hlOnSelectionEnd);
